@@ -1,0 +1,2816 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier — Pilotage de la maintenance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f6f4f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121010" media="(prefers-color-scheme: dark)">
+<script>
+/* applique le thème avant la première peinture, pour éviter tout flash */
+(function(){
+  var pref='auto';
+  try{ pref=localStorage.getItem('atelier-theme')||'auto'; }catch(e){}
+  var dark = pref==='dark' || (pref==='auto' && window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark?'dark':'light';
+  document.documentElement.dataset.themePref = pref;
+})();
+</script>
+<style>
+/* ===================================================================
+   JETONS — monde : atelier de maintenance minière, Katanga
+   =================================================================== */
+:root{
+  /* surfaces : latérite / papier */
+  --dust:#f6f4f1; --paper:#fdfcfa; --paper-2:#f9f7f4; --paper-3:#f2efea; --paper-4:#ebe7e1;
+  /* encres */
+  --graphite:#1c1917; --graphite-2:#57534e; --graphite-3:#79716b; --graphite-4:#a8a29e;
+  /* traits (opacité faible : se fondent, restent trouvables) */
+  --rule:rgba(28,25,23,.08); --rule-2:rgba(28,25,23,.13); --rule-3:rgba(28,25,23,.20);
+  /* accent : malachite (cuivre oxydé) + cuivre brut */
+  --malachite:#0d7a6d; --malachite-deep:#0b6e63; --malachite-ink:#09554c; --malachite-wash:#e7f3f1; --malachite-edge:#bfddd7;
+  --copper:#a85c32; --copper-wash:#f8efe8;
+  /* états — réservés, jamais réutilisés en série */
+  --clear:#0aac23; --clear-ink:#06761a; --clear-wash:#e8f7ea;
+  --caution:#fbb315; --caution-ink:#875c00; --caution-wash:#fff5e0;
+  --serious:#f18a59; --serious-ink:#9a4a1c;
+  --hazard:#dc3c3d; --hazard-ink:#ad2526; --hazard-wash:#fdecec;
+  /* catégories de tâches (cahier des charges, palette validée CVD) */
+  --t-prev:#1b64be; --t-corr:#ec4647; --t-insp:#f2a600; --t-camp:#8b5cf6;
+  --t-prev-w:#e8f0fb; --t-corr-w:#fdecec; --t-insp-w:#fdf3df; --t-camp-w:#f1ecfe;
+  --t-prev-i:#14529e; --t-corr-i:#b02526; --t-insp-i:#875c00; --t-camp-i:#5b35c4;
+  /* profondeur : une seule stratégie — anneau + deux ombres douces */
+  --lift:0 0 0 1px rgba(28,25,23,.06), 0 1px 2px -1px rgba(28,25,23,.06), 0 2px 4px rgba(28,25,23,.035);
+  --lift-2:0 0 0 1px rgba(28,25,23,.07), 0 4px 8px -2px rgba(28,25,23,.07), 0 14px 28px -10px rgba(28,25,23,.10);
+  --lift-3:0 0 0 1px rgba(28,25,23,.08), 0 8px 16px -4px rgba(28,25,23,.09), 0 28px 56px -16px rgba(28,25,23,.16);
+  /* rayons : échelle */
+  --r-xs:4px; --r-sm:6px; --r:9px; --r-lg:13px; --r-xl:18px;
+  /* espacement : base 4 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px;
+  /* typographie */
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  /* mouvement */
+  --out:cubic-bezier(.23,1,.32,1); --inout:cubic-bezier(.77,0,.175,1);
+  /* gabarit */
+  --rail:216px; --pad:24px;
+  color-scheme:light;
+}
+
+/* ===================================================================
+   MODE SOMBRE — pas un simple négatif : chaque valeur est re-calée sur
+   la surface sombre et re-validée (contraste, CVD).
+   =================================================================== */
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --dust:#121010; --paper:#1b1915; --paper-2:#232019; --paper-3:#2b2721; --paper-4:#35302a;
+  --graphite:#f2efe9; --graphite-2:#b5aea3; --graphite-3:#8d867b; --graphite-4:#6d665d;
+  --rule:rgba(255,255,255,.09); --rule-2:rgba(255,255,255,.15); --rule-3:rgba(255,255,255,.24);
+  --malachite:#35b09c; --malachite-deep:#2a9d8a; --malachite-ink:#6fd3c1;
+  --malachite-wash:rgba(53,176,156,.15); --malachite-edge:rgba(53,176,156,.38);
+  --copper:#d08a5c; --copper-wash:rgba(208,138,92,.14);
+  /* états : mêmes pas réservés, tous ≥ 3:1 sur la surface sombre */
+  --clear-ink:#5fd473; --clear-wash:rgba(10,172,35,.17);
+  --caution-ink:#fbc85a; --caution-wash:rgba(251,179,21,.15);
+  --hazard-ink:#ff8384; --hazard-wash:rgba(220,60,61,.19);
+  /* catégories : pas propres au fond sombre (CVD ΔE 9,0 · vision normale 18) */
+  --t-prev:#4086bd; --t-corr:#ed7470; --t-insp:#987e23; --t-camp:#af5efe;
+  --t-prev-w:rgba(64,134,189,.19); --t-corr-w:rgba(237,116,112,.17);
+  --t-insp-w:rgba(152,126,35,.22); --t-camp-w:rgba(175,94,254,.17);
+  --t-prev-i:#7fb6e2; --t-corr-i:#f2a09d; --t-insp-i:#cfae52; --t-camp-i:#c894fd;
+  /* profondeur : sur fond sombre l'ombre ne porte pas — on s'appuie sur l'anneau */
+  --lift:0 0 0 1px rgba(255,255,255,.08);
+  --lift-2:0 0 0 1px rgba(255,255,255,.13), 0 2px 8px rgba(0,0,0,.4);
+  --lift-3:0 0 0 1px rgba(255,255,255,.15), 0 12px 40px rgba(0,0,0,.6);
+}
+:root[data-theme="dark"] .mark-badge svg{stroke:#0e1b18}
+:root[data-theme="dark"] .btn.key{color:#0e1b18;box-shadow:0 0 0 1px var(--malachite-deep)}
+:root[data-theme="dark"] .menu a.on{background:var(--paper-2)}
+:root[data-theme="dark"] .fleet{background:var(--paper-3);color:var(--graphite)}
+:root[data-theme="dark"] .scrim,:root[data-theme="dark"] .cmd-scrim{background:rgba(0,0,0,.62)}
+:root[data-theme="dark"] .puff{background:var(--paper-4);color:var(--graphite);box-shadow:var(--lift-2)}
+:root[data-theme="dark"] .meter-over{background:repeating-linear-gradient(135deg,var(--hazard) 0 4px,#9e2b2c 4px 8px)}
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);background-clip:content-box;border:3px solid transparent}
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.3);background-clip:content-box;border:3px solid transparent}
+:root[data-theme="dark"] .day.today{background:var(--malachite-wash)}
+:root[data-theme="dark"] .year-wrap td.mo:not(.nil):hover{box-shadow:inset 0 0 0 1.5px var(--malachite)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans);background:var(--dust);color:var(--graphite);
+  font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  font-feature-settings:"ss01","cv05";
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+h1,h2,h3,h4{text-wrap:balance;letter-spacing:-.018em}
+p,td,li{text-wrap:pretty}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:"zero"}
+::selection{background:var(--malachite-wash);color:var(--malachite-ink)}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:rgba(28,25,23,.16);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(28,25,23,.26);background-clip:content-box;border:3px solid transparent}
+::-webkit-scrollbar-track{background:transparent}
+:focus-visible{outline:2px solid var(--malachite);outline-offset:2px;border-radius:var(--r-xs)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ===================================================================
+   COQUE — rail clair, même plan que le canevas, séparé par un filet
+   =================================================================== */
+.app{display:flex;height:100vh;overflow:hidden}
+.rail{
+  width:var(--rail);flex:0 0 var(--rail);background:var(--dust);border-right:1px solid var(--rule-2);
+  display:flex;flex-direction:column;transition:width .22s var(--out),flex-basis .22s var(--out),transform .26s var(--out);
+  z-index:40
+}
+.app.tight .rail{width:56px;flex-basis:56px}
+.mark{display:flex;align-items:center;gap:10px;padding:var(--s4) 14px var(--s3)}
+.mark-badge{
+  width:28px;height:28px;flex:0 0 28px;border-radius:var(--r-sm);
+  background:var(--malachite);display:grid;place-items:center;box-shadow:var(--lift)
+}
+.mark-badge svg{width:16px;height:16px;stroke:#fff}
+.mark-txt{min-width:0;overflow:hidden;white-space:nowrap}
+.mark-txt b{display:block;font-size:13px;font-weight:600;letter-spacing:-.02em;line-height:1.25}
+.mark-txt span{display:block;font-size:11px;color:var(--graphite-3);line-height:1.3}
+.app.tight .mark-txt{display:none}
+
+.jump{margin:0 10px var(--s3);display:flex;align-items:center;gap:7px;width:calc(100% - 20px);
+  padding:6px 9px;border-radius:var(--r-sm);background:var(--paper);box-shadow:var(--lift);
+  color:var(--graphite-3);font-size:12px;transition:box-shadow .14s var(--out),color .14s}
+.jump:hover{box-shadow:var(--lift-2);color:var(--graphite-2)}
+.jump svg{width:13px;height:13px;flex:0 0 13px;stroke:currentColor}
+.jump .kbd{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--graphite-4);
+  border:1px solid var(--rule-2);border-radius:var(--r-xs);padding:0 4px;line-height:15px}
+.app.tight .jump .tx,.app.tight .jump .kbd{display:none}
+.app.tight .jump{justify-content:center}
+
+.menu{flex:1;overflow-y:auto;padding:0 10px var(--s3);display:flex;flex-direction:column;gap:1px}
+.menu-lbl{color:var(--graphite-4);font-size:10px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;padding:var(--s4) 9px 5px}
+.app.tight .menu-lbl{height:12px;padding:6px 0;overflow:hidden;text-indent:-999px}
+.menu a{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:var(--r-sm);
+  color:var(--graphite-2);font-size:13px;font-weight:450;cursor:pointer;white-space:nowrap;
+  transition:background .13s var(--out),color .13s var(--out);position:relative;min-height:32px}
+.menu a svg{width:15px;height:15px;flex:0 0 15px;stroke:currentColor;opacity:.72}
+.menu a:hover{background:rgba(28,25,23,.045);color:var(--graphite)}
+.menu a.on{background:var(--paper);color:var(--graphite);font-weight:550;box-shadow:var(--lift)}
+.menu a.on svg{stroke:var(--malachite);opacity:1}
+.menu a .tally{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:600;
+  min-width:18px;height:17px;line-height:17px;text-align:center;border-radius:5px;padding:0 4px}
+.menu a .tally.hz{background:var(--hazard-wash);color:var(--hazard-ink)}
+.menu a .tally.ct{background:var(--caution-wash);color:var(--caution-ink)}
+.app.tight .menu a .tx,.app.tight .menu a .tally{display:none}
+.app.tight .menu a{justify-content:center;padding:7px 0}
+
+.rail-end{padding:var(--s2) 10px var(--s3);border-top:1px solid var(--rule)}
+.tighten{display:flex;align-items:center;gap:10px;width:100%;padding:6px 9px;border-radius:var(--r-sm);
+  color:var(--graphite-3);font-size:12px;transition:background .13s}
+.tighten:hover{background:rgba(28,25,23,.045);color:var(--graphite-2)}
+.tighten svg{width:14px;height:14px;flex:0 0 14px;stroke:currentColor;transition:transform .22s var(--out)}
+.app.tight .tighten svg{transform:rotate(180deg)}
+.app.tight .tighten .tx{display:none}
+.app.tight .tighten{justify-content:center}
+
+.stage{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;background:var(--dust)}
+.crown{padding:var(--s4) var(--pad) 0;flex:0 0 auto}
+.crown-row{display:flex;align-items:flex-start;gap:var(--s4);flex-wrap:wrap}
+.crown h1{font-size:21px;font-weight:600;letter-spacing:-.03em;line-height:1.18}
+.crown .lede{color:var(--graphite-3);font-size:12.5px;margin-top:2px}
+.crown-act{margin-left:auto;display:flex;align-items:center;gap:var(--s2)}
+
+.beacon{display:flex;align-items:center;gap:7px;cursor:pointer;transition:box-shadow .14s var(--out);font-size:11.5px;color:var(--graphite-2);
+  background:var(--paper);box-shadow:var(--lift);padding:5px 11px;border-radius:99px;white-space:nowrap}
+.beacon:hover{box-shadow:var(--lift-2)}
+.beacon .led{width:6px;height:6px;border-radius:50%;flex:0 0 6px;background:var(--graphite-4)}
+.beacon .led.live{background:var(--clear);animation:breathe 2.6s var(--inout) infinite}
+.beacon .led.stale{background:var(--caution)}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(10,172,35,.34)}55%{box-shadow:0 0 0 4px rgba(10,172,35,0)}}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;
+  padding:0 11px;border-radius:var(--r-sm);font-size:12.5px;font-weight:500;background:var(--paper);
+  box-shadow:var(--lift);transition:box-shadow .14s var(--out),transform .1s var(--out),background .14s;white-space:nowrap}
+.btn svg{width:14px;height:14px;stroke:currentColor;flex:0 0 14px}
+.btn:hover{box-shadow:var(--lift-2)}
+.btn:active{transform:scale(.97)}
+.btn.key{background:var(--malachite);color:#fff;box-shadow:0 0 0 1px var(--malachite-deep),0 1px 2px rgba(11,110,99,.3)}
+.btn.key:hover{background:var(--malachite-deep)}
+.btn.sm{min-height:26px;padding:0 9px;font-size:12px}
+.btn.icon{padding:0;width:30px;flex:0 0 30px}
+.btn.sm.icon{width:26px;flex:0 0 26px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.btn.busy svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* barre de filtres */
+.sieve{display:flex;gap:7px;align-items:center;padding:var(--s3) 0 14px;flex-wrap:wrap}
+.pick{position:relative;display:inline-flex;align-items:center}
+.pick select{appearance:none;background:var(--paper);box-shadow:var(--lift);padding:0 26px 0 10px;
+  height:28px;border-radius:var(--r-sm);font-size:12px;cursor:pointer;max-width:176px;
+  text-overflow:ellipsis;transition:box-shadow .14s var(--out)}
+.pick select:hover{box-shadow:var(--lift-2)}
+.pick select.set{background:var(--malachite-wash);color:var(--malachite-ink);font-weight:550;
+  box-shadow:0 0 0 1px var(--malachite-edge)}
+.pick .caret{position:absolute;right:9px;pointer-events:none;display:grid;place-items:center}
+.pick .caret svg{width:11px;height:11px;stroke:var(--graphite-4)}
+.pick select.set+.caret svg{stroke:var(--malachite)}
+.strike{color:var(--malachite);font-size:12px;font-weight:550;padding:4px 6px;border-radius:var(--r-xs);transition:background .13s}
+.strike:hover{background:var(--malachite-wash)}
+.tally-txt{font-size:11.5px;color:var(--graphite-3);margin-left:auto;white-space:nowrap}
+
+.deck{flex:1;overflow-y:auto;padding:0 var(--pad) 56px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+.sheet{display:none}
+.sheet.on{display:block;animation:rise .26s var(--out)}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ===================================================================
+   PANNEAUX
+   =================================================================== */
+.panel{background:var(--paper);border-radius:var(--r-lg);box-shadow:var(--lift);min-width:0}
+.panel-body,.panel-body.bare{min-width:0}
+.panel-top{display:flex;align-items:center;gap:9px;padding:13px 15px;border-bottom:1px solid var(--rule)}
+.panel-top h2{font-size:14px;font-weight:600;letter-spacing:-.022em}
+.panel-top .aside{font-size:12px;color:var(--graphite-3);font-weight:400}
+.panel-top .end{margin-left:auto;display:flex;align-items:center;gap:7px}
+.panel-body{padding:15px}
+.panel-body.bare{padding:0}
+.rank{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--graphite-3);
+  margin:var(--s6) 0 11px;display:flex;align-items:center;gap:9px}
+.rank:first-child{margin-top:0}
+.rank::after{content:"";flex:1;height:1px;background:var(--rule)}
+.row{display:grid;gap:14px}
+.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.c7{grid-template-columns:repeat(7,minmax(0,1fr))}
+.lean{grid-template-columns:1.32fr 1fr}
+.lean-r{grid-template-columns:1fr 1.25fr}
+@media(max-width:1480px){.c7{grid-template-columns:repeat(4,minmax(0,1fr))}.c5{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.row>*{min-width:0}
+@media(max-width:1200px){.c7,.c5,.c4,.c3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .c2,.lean,.lean-r{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.c7,.c5,.c4,.c3{grid-template-columns:minmax(0,1fr)}}
+
+/* ===================================================================
+   SIGNATURE — réglette de compteur horaire
+   =================================================================== */
+.meter{display:block;width:100%}
+.meter-track{position:relative;height:7px;border-radius:4px;background:var(--paper-4);overflow:visible}
+.meter-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--malachite);
+  transition:width .6s var(--out)}
+.meter-fill.warn{background:var(--caution)}
+.meter-fill.over{background:var(--hazard)}
+.meter-notch{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--graphite);opacity:.42}
+.meter-over{position:absolute;top:0;bottom:0;border-radius:0 4px 4px 0;
+  background:repeating-linear-gradient(135deg,var(--hazard) 0 4px,#c23132 4px 8px)}
+.meter-read{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:5px;flex-wrap:nowrap}
+.meter-read .idx{font-family:var(--mono);font-size:10.5px;color:var(--graphite-3);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.meter-read .rest{font-family:var(--mono);font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;
+  white-space:nowrap;flex:0 0 auto}
+.meter-read .rest .suf{font-family:var(--sans);font-size:10px;font-weight:500;opacity:.72;margin-left:3px}
+.meter-read .rest.ok{color:var(--graphite)}
+.meter-read .rest.warn{color:var(--caution-ink)}
+.meter-read .rest.over{color:var(--hazard-ink)}
+
+/* file de triage — l'élément focal de l'accueil */
+.queue{display:flex;flex-direction:column}
+.q-item{display:grid;grid-template-columns:58px 1fr 196px;gap:13px;align-items:center;
+  padding:11px 15px;border-bottom:1px solid var(--rule);cursor:pointer;
+  transition:background .13s var(--out);text-align:left;width:100%}
+.q-item:last-child{border-bottom:0}
+.q-item:hover{background:var(--paper-2)}
+.q-item:active{background:var(--paper-3)}
+.fleet{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:-.02em;
+  background:var(--paper-3);border-radius:var(--r-xs);padding:3px 0;text-align:center;
+  box-shadow:inset 0 0 0 1px var(--rule-2);color:var(--graphite)}
+.q-id{display:flex;flex-direction:column;gap:2px;min-width:0}
+.q-id .nm{font-size:12.5px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-id .sub{font-size:11px;color:var(--graphite-3);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.q-m{min-width:0}
+@media(max-width:1340px){.q-item{grid-template-columns:54px 1fr 168px;gap:10px}}
+
+/* ===================================================================
+   TUILES — trois paliers de hiérarchie
+   =================================================================== */
+.stat{background:var(--paper);border-radius:var(--r);padding:13px 14px;box-shadow:var(--lift);
+  text-align:left;width:100%;display:block;position:relative;overflow:hidden;
+  transition:box-shadow .15s var(--out),transform .15s var(--out)}
+button.stat{cursor:pointer}
+button.stat:hover{box-shadow:var(--lift-2);transform:translateY(-1px)}
+button.stat:active{transform:scale(.985)}
+.stat-k{display:flex;align-items:center;gap:6px;color:var(--graphite-3);font-size:10.5px;
+  font-weight:550;letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
+.stat-k svg{width:12px;height:12px;stroke:currentColor;flex:0 0 12px}
+.stat-v{font-size:26px;font-weight:600;letter-spacing:-.045em;line-height:1.03;
+  font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:4px}
+.stat-v .unit{font-size:13px;font-weight:500;color:var(--graphite-3);letter-spacing:-.01em}
+.stat-d{font-size:11px;color:var(--graphite-3);margin-top:4px;line-height:1.35}
+.stat.hz .stat-v{color:var(--hazard-ink)} .stat.hz .stat-k svg{stroke:var(--hazard)}
+.stat.ct .stat-v{color:var(--caution-ink)} .stat.ct .stat-k svg{stroke:var(--caution)}
+.stat.cl .stat-k svg{stroke:var(--clear)}
+.stat.ml .stat-k svg{stroke:var(--malachite)}
+.stat .go{position:absolute;right:11px;top:11px;opacity:0;transition:opacity .15s var(--out),transform .15s var(--out);transform:translateX(-3px)}
+.stat .go svg{width:13px;height:13px;stroke:var(--graphite-4)}
+button.stat:hover .go{opacity:1;transform:none}
+
+/* palier 3 — bande compacte */
+.strip{background:var(--paper);border-radius:var(--r);box-shadow:var(--lift);display:flex;flex-wrap:wrap}
+.strip-cell{flex:1 1 150px;min-width:132px;padding:11px 14px;position:relative;text-align:left;
+  transition:background .13s var(--out)}
+button.strip-cell{cursor:pointer}
+button.strip-cell:hover{background:var(--paper-2)}
+.strip-cell+.strip-cell::before{content:"";position:absolute;left:0;top:11px;bottom:11px;width:1px;background:var(--rule)}
+.strip-k{font-size:10.5px;font-weight:550;letter-spacing:.055em;text-transform:uppercase;color:var(--graphite-3);
+  display:flex;align-items:center;gap:5px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip-k .pip{width:5px;height:5px;border-radius:50%;flex:0 0 5px;background:var(--graphite-4)}
+.strip-k .pip.hz{background:var(--hazard)} .strip-k .pip.ct{background:var(--caution)} .strip-k .pip.cl{background:var(--clear)}
+.strip-v{font-size:18px;font-weight:600;letter-spacing:-.035em;font-variant-numeric:tabular-nums;line-height:1.1}
+.strip-d{font-size:10.5px;color:var(--graphite-4);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===================================================================
+   BANDEAU DISPONIBILITÉ
+   =================================================================== */
+.crest{background:var(--paper);border-radius:var(--r-lg);box-shadow:var(--lift);
+  display:grid;grid-template-columns:auto 1fr;gap:var(--s8);padding:18px 20px;align-items:center}
+@media(max-width:980px){.crest{grid-template-columns:1fr;gap:var(--s5)}}
+.crest-fig{display:flex;align-items:center;gap:16px}
+.crest-num{font-size:44px;font-weight:600;letter-spacing:-.055em;line-height:.95;font-variant-numeric:tabular-nums}
+.crest-num .unit{font-size:19px;font-weight:500;color:var(--graphite-3);letter-spacing:-.02em}
+.crest-k{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--graphite-3);margin-bottom:5px}
+.crest-sub{font-size:12px;color:var(--graphite-3);margin-top:6px}
+.crest-split{height:9px;border-radius:5px;display:flex;overflow:hidden;background:var(--paper-4)}
+.crest-split i{display:block;height:100%;transition:width .6s var(--out)}
+.crest-split i+i{box-shadow:inset 2px 0 0 var(--paper)}
+.crest-keys{display:flex;gap:18px;margin-top:11px;flex-wrap:wrap}
+.crest-keys button{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--graphite-2);
+  padding:3px 7px;margin:-3px -7px;border-radius:var(--r-xs);transition:background .13s}
+.crest-keys button:hover{background:var(--paper-2)}
+.crest-keys .sw{width:8px;height:8px;border-radius:2.5px;flex:0 0 8px}
+.crest-keys b{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ===================================================================
+   TABLEAUX
+   =================================================================== */
+.grid-wrap{overflow:auto;max-height:540px;border-radius:0 0 var(--r-lg) var(--r-lg)}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+thead th{position:sticky;top:0;z-index:2;background:var(--paper-2);text-align:left;
+  font-weight:600;color:var(--graphite-3);font-size:10.5px;letter-spacing:.055em;text-transform:uppercase;
+  padding:8px 12px;border-bottom:1px solid var(--rule-2);white-space:nowrap;user-select:none}
+thead th.sortable{cursor:pointer;transition:color .13s}
+thead th.sortable:hover{color:var(--graphite)}
+thead th .arr{display:inline-block;width:9px;margin-left:3px;opacity:0;transition:opacity .13s}
+thead th.sorted .arr{opacity:1;color:var(--malachite)}
+thead th.num,tbody td.num{text-align:right}
+tbody td{padding:8px 12px;border-bottom:1px solid var(--rule);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.tap{cursor:pointer;transition:background .12s}
+tbody tr.tap:hover td{background:var(--paper-2)}
+tbody td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tbody td.hd{font-weight:600}
+.void{padding:38px 20px;text-align:center}
+.void svg{width:22px;height:22px;stroke:var(--graphite-4);margin-bottom:8px}
+.void b{display:block;color:var(--graphite-2);font-size:13px;font-weight:550;margin-bottom:3px}
+.void span{font-size:12px;color:var(--graphite-3)}
+
+/* jetons */
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:550;
+  padding:2px 7px;border-radius:5px;white-space:nowrap;letter-spacing:.005em}
+.tag .pip{width:5px;height:5px;border-radius:50%;flex:0 0 5px}
+.tag svg{width:11px;height:11px;stroke:currentColor;flex:0 0 11px}
+.g-prev{background:var(--t-prev-w);color:var(--t-prev-i)} .g-prev .pip{background:var(--t-prev)}
+.g-corr{background:var(--t-corr-w);color:var(--t-corr-i)} .g-corr .pip{background:var(--t-corr)}
+.g-insp{background:var(--t-insp-w);color:var(--t-insp-i)} .g-insp .pip{background:var(--t-insp)}
+.g-camp{background:var(--t-camp-w);color:var(--t-camp-i)} .g-camp .pip{background:var(--t-camp)}
+.g-cl{background:var(--clear-wash);color:var(--clear-ink)} .g-cl .pip{background:var(--clear)}
+.g-ct{background:var(--caution-wash);color:var(--caution-ink)} .g-ct .pip{background:var(--caution)}
+.g-hz{background:var(--hazard-wash);color:var(--hazard-ink)} .g-hz .pip{background:var(--hazard)}
+.g-ml{background:var(--malachite-wash);color:var(--malachite-ink)} .g-ml .pip{background:var(--malachite)}
+.g-mt{background:var(--paper-3);color:var(--graphite-2)} .g-mt .pip{background:var(--graphite-4)}
+
+/* ===================================================================
+   GRAPHIQUES
+   =================================================================== */
+.plots{display:flex;flex-direction:column;gap:10px}
+.plot{display:grid;grid-template-columns:minmax(92px,auto) 1fr minmax(58px,auto);gap:11px;align-items:center;
+  width:100%;text-align:left;padding:2px 0;border-radius:var(--r-xs);transition:background .12s}
+button.plot{cursor:pointer}
+button.plot:hover{background:var(--paper-2)}
+.plot-k{font-size:12px;font-weight:450;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plot-t{height:17px;border-radius:var(--r-xs);background:var(--paper-3);overflow:hidden}
+.plot-f{height:100%;border-radius:0 var(--r-xs) var(--r-xs) 0;transition:width .55s var(--out);min-width:2px}
+.plot-v{font-family:var(--mono);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.plot-v small{font-family:var(--sans);font-weight:450;color:var(--graphite-4);font-size:10.5px;margin-left:5px}
+.cols{display:flex;align-items:flex-end;gap:12px;height:178px}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;height:100%}
+.col-st{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px}
+.col-b{flex:1;max-width:24px;border-radius:3px 3px 0 0;position:relative;transition:height .55s var(--out);min-height:2px}
+.col-b .cap{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:var(--mono);
+  font-size:10px;font-weight:600;color:var(--graphite-2);font-variant-numeric:tabular-nums}
+.col-k{font-size:10.5px;color:var(--graphite-3);white-space:nowrap}
+.col-k.now{color:var(--malachite);font-weight:600}
+.keys{display:flex;gap:15px;flex-wrap:wrap;margin-top:13px;padding-top:12px;border-top:1px solid var(--rule)}
+.keys div{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--graphite-3)}
+.keys .sw{width:9px;height:9px;border-radius:2.5px;flex:0 0 9px}
+.keys b{color:var(--graphite);font-weight:550}
+.ring{display:flex;align-items:center;gap:18px}
+.tray{display:flex;flex-direction:column}
+.tray button,.tray>div{display:flex;justify-content:space-between;gap:16px;padding:8px 0;
+  border-bottom:1px solid var(--rule);font-size:12.5px;width:100%;text-align:left;transition:background .12s}
+.tray button{cursor:pointer;padding-left:5px;padding-right:5px;margin:0 -5px;width:calc(100% + 10px);border-radius:var(--r-xs)}
+.tray button:hover{background:var(--paper-2)}
+.tray>*:last-child{border-bottom:0}
+.tray .k{color:var(--graphite-2);display:flex;align-items:center;gap:7px}
+.tray .k .pip{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+.tray .v{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.murmur{font-size:11px;color:var(--graphite-4);margin-top:9px;line-height:1.45}
+
+/* ===================================================================
+   CALENDRIERS
+   =================================================================== */
+.steer{display:flex;align-items:center;gap:5px}
+.step{width:25px;height:25px;border-radius:var(--r-sm);display:grid;place-items:center;
+  color:var(--graphite-3);transition:background .13s,color .13s}
+.step:hover{background:var(--paper-3);color:var(--graphite)}
+.step svg{width:13px;height:13px;stroke:currentColor}
+.cursor-lbl{font-size:12.5px;font-weight:550;min-width:122px;text-align:center;text-transform:capitalize;
+  font-variant-numeric:tabular-nums}
+.year-wrap{overflow-x:auto}
+.year-wrap table{min-width:900px}
+.year-wrap th.cg{text-align:left;min-width:170px;position:sticky;left:0;z-index:3;background:var(--paper-2)}
+.year-wrap td.cg{position:sticky;left:0;z-index:1;background:var(--paper);font-weight:500;white-space:nowrap}
+.year-wrap tbody tr:hover td.cg{background:var(--paper-2)}
+.year-wrap td.mo{text-align:center;font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500;
+  cursor:pointer;transition:box-shadow .12s;padding:0}
+.year-wrap td.mo button{width:100%;padding:8px 12px;font:inherit;color:inherit;border-radius:var(--r-xs)}
+.year-wrap td.mo.nil{color:var(--graphite-4);font-weight:400;cursor:default}
+.year-wrap td.mo:not(.nil):hover{box-shadow:inset 0 0 0 1.5px var(--malachite)}
+.year-wrap td.now{box-shadow:inset 0 0 0 1.5px var(--malachite-edge)}
+.year-wrap tfoot td{padding:9px 12px;font-weight:600;background:var(--paper-2);border-top:1.5px solid var(--rule-2);
+  text-align:center;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.year-wrap tfoot td:first-child{text-align:left;position:sticky;left:0;z-index:1;background:var(--paper-2);font-family:var(--sans)}
+.cat-k{display:inline-flex;align-items:center;gap:8px}
+.cat-k .sw{width:8px;height:8px;border-radius:2.5px;flex:0 0 8px}
+.cat-k svg{width:13px;height:13px;stroke:var(--graphite-3)}
+
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--rule);min-width:0}
+.day{min-width:0}
+.month .dow{background:var(--paper-2);padding:7px 9px;font-size:10px;font-weight:600;color:var(--graphite-3);
+  text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--rule);text-align:center}
+.month .dow+.dow{border-left:1px solid var(--rule)}
+.day{min-height:84px;border-bottom:1px solid var(--rule);padding:5px 6px;display:flex;flex-direction:column;gap:2px;
+  background:var(--paper);transition:background .12s;text-align:left;align-items:stretch}
+.day:nth-child(7n+2),.day:nth-child(7n+3),.day:nth-child(7n+4),.day:nth-child(7n+5),.day:nth-child(7n+6),.day:nth-child(7n+7),.day:nth-child(7n+1){border-left:1px solid var(--rule)}
+.day:nth-child(7n+1){border-left:0}
+button.day{cursor:pointer}
+button.day:hover{background:var(--paper-2)}
+.day.pale{background:var(--paper-2)}
+.day.pale .dnum{color:var(--graphite-4);font-weight:400}
+.day.today{background:var(--malachite-wash)}
+.dnum{font-size:11.5px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:5px;
+  font-variant-numeric:tabular-nums}
+.day.today .dnum{color:var(--malachite-ink)}
+.day.today .dnum::after{content:"auj.";font-size:9px;font-weight:600;background:var(--malachite);color:#fff;
+  padding:0 4px;border-radius:3px;line-height:13px;letter-spacing:.02em}
+.chip{display:flex;align-items:center;gap:4px;font-size:10.5px;padding:2px 5px;border-radius:4px;
+  line-height:1.3;border-left:2px solid;text-align:left}
+.chip .pip{display:none;width:4px;height:4px;border-radius:50%;flex:0 0 4px}
+.chip .tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:450}
+.chip .tx b{font-family:var(--mono);font-weight:600}
+.k-prev{background:var(--t-prev-w);border-color:var(--t-prev);color:var(--t-prev-i)} .k-prev .pip{background:var(--t-prev)}
+.k-corr{background:var(--t-corr-w);border-color:var(--t-corr);color:var(--t-corr-i)} .k-corr .pip{background:var(--t-corr)}
+.k-insp{background:var(--t-insp-w);border-color:var(--t-insp);color:var(--t-insp-i)} .k-insp .pip{background:var(--t-insp)}
+.k-camp{background:var(--t-camp-w);border-color:var(--t-camp);color:var(--t-camp-i)} .k-camp .pip{background:var(--t-camp)}
+.chip-more{font-size:10px;color:var(--graphite-4);padding:0 5px;font-weight:550}
+@media(min-width:761px){ .day .chip:nth-of-type(4){display:none} }
+
+.week-wrap{overflow-x:auto}
+.week{display:grid;grid-template-columns:52px repeat(7,minmax(98px,1fr));min-width:760px;border-top:1px solid var(--rule)}
+.week .wh{background:var(--paper-2);padding:6px 8px;font-size:10.5px;font-weight:600;color:var(--graphite-3);
+  border-bottom:1px solid var(--rule);border-left:1px solid var(--rule);text-align:center;line-height:1.25}
+.week .wh:first-child{border-left:0}
+.week .wh b{display:block;font-size:14px;color:var(--graphite);font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.week .wh.now{background:var(--malachite-wash);color:var(--malachite-ink)}
+.week .wh.now b{color:var(--malachite-ink)}
+.week .hour{background:var(--paper-2);font-family:var(--mono);font-size:10px;color:var(--graphite-4);
+  padding:5px 7px;text-align:right;border-bottom:1px solid var(--rule);font-variant-numeric:tabular-nums}
+.slotc{min-height:36px;border-bottom:1px solid var(--rule);border-left:1px solid var(--rule);
+  padding:2px;display:flex;flex-direction:column;gap:2px}
+.slotc.now{background:rgba(13,122,109,.035)}
+.wchip{font-size:10px;padding:3px 5px;border-radius:4px;border-left:2px solid;line-height:1.25;
+  overflow:hidden;text-align:left;cursor:pointer;transition:filter .12s}
+.wchip:hover{filter:brightness(.96)}
+.wchip b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wchip span{display:block;opacity:.82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9.5px;font-family:var(--mono)}
+
+/* ===================================================================
+   ALERTES
+   =================================================================== */
+.flags{display:flex;flex-direction:column}
+.flag{display:flex;gap:11px;padding:11px 15px;border-bottom:1px solid var(--rule);align-items:flex-start;
+  width:100%;text-align:left;cursor:pointer;transition:background .12s}
+.flag:last-child{border-bottom:0}
+.flag:hover{background:var(--paper-2)}
+.flag-ic{width:27px;height:27px;flex:0 0 27px;border-radius:var(--r-sm);display:grid;place-items:center}
+.flag-ic svg{width:14px;height:14px}
+.flag-b{flex:1;min-width:0}
+.flag-b .hd{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag-b .bd{font-size:11.5px;color:var(--graphite-3);margin-top:2px;line-height:1.4}
+.flag-b .bd code{font-family:var(--mono);font-size:11px;background:var(--paper-3);padding:0 3px;border-radius:3px}
+.flag-n{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;
+  flex:0 0 auto;align-self:center}
+.settled{padding:30px 20px;text-align:center}
+.settled svg{width:22px;height:22px;stroke:var(--clear);margin-bottom:8px}
+.settled b{font-size:13px;color:var(--clear-ink);display:block}
+.settled span{font-size:12px;color:var(--graphite-3);display:block;margin-top:3px}
+
+/* ===================================================================
+   TIROIR ENGIN
+   =================================================================== */
+.scrim{position:fixed;inset:0;background:rgba(28,25,23,.26);opacity:0;pointer-events:none;
+  transition:opacity .22s var(--out);z-index:60;backdrop-filter:blur(1.5px)}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--paper);
+  box-shadow:var(--lift-3);z-index:61;transform:translateX(100%);transition:transform .28s var(--out);
+  display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.drawer-top{padding:16px 18px 14px;border-bottom:1px solid var(--rule);display:flex;gap:13px;align-items:flex-start}
+.drawer-top .fleet{font-size:16px;padding:6px 10px;flex:0 0 auto}
+.drawer-id{flex:1;min-width:0}
+.drawer-id h3{font-size:15px;font-weight:600;letter-spacing:-.025em;line-height:1.25}
+.drawer-id .meta{font-size:11.5px;color:var(--graphite-3);margin-top:4px;display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.drawer-id .meta>span{display:inline-flex;align-items:center;gap:5px}
+.drawer-id .meta svg{width:12px;height:12px;stroke:currentColor;flex:0 0 12px}
+.drawer-body{flex:1;overflow-y:auto;padding:16px 18px 32px}
+.drawer-sec{margin-bottom:var(--s6)}
+.drawer-sec:last-child{margin-bottom:0}
+.drawer-sec h4{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--graphite-3);margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.drawer-sec h4::after{content:"";flex:1;height:1px;background:var(--rule)}
+.drawer-sec h4 .ct{font-family:var(--mono);font-size:10px;background:var(--paper-3);padding:0 5px;
+  border-radius:3px;letter-spacing:0;color:var(--graphite-2)}
+.facts{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--rule);
+  border-radius:var(--r-sm);overflow:hidden}
+.facts div{background:var(--paper);padding:7px 10px}
+.facts .k{font-size:10px;color:var(--graphite-3);text-transform:uppercase;letter-spacing:.06em;font-weight:550}
+.facts .v{font-size:12.5px;font-weight:600;margin-top:1px;font-variant-numeric:tabular-nums}
+.facts .v.mono{font-family:var(--mono)}
+.log{display:flex;flex-direction:column;gap:0}
+.log-item{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--rule)}
+.log-item:last-child{border-bottom:0}
+.log-rail{flex:0 0 3px;border-radius:2px;background:var(--graphite-4)}
+.log-rail.prev{background:var(--t-prev)} .log-rail.corr{background:var(--t-corr)}
+.log-rail.insp{background:var(--t-insp)} .log-rail.camp{background:var(--t-camp)}
+.log-b{flex:1;min-width:0}
+.log-b .t{font-size:12.5px;font-weight:550;line-height:1.35}
+.log-b .m{font-size:11px;color:var(--graphite-3);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.log-b .m .dt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ===================================================================
+   PALETTE DE COMMANDES
+   =================================================================== */
+.cmd-scrim{position:fixed;inset:0;background:rgba(28,25,23,.3);opacity:0;pointer-events:none;
+  transition:opacity .18s var(--out);z-index:70;backdrop-filter:blur(2px)}
+.cmd-scrim.on{opacity:1;pointer-events:auto}
+.cmd{position:fixed;top:14vh;left:50%;width:min(540px,92vw);transform:translate(-50%,-8px) scale(.97);
+  background:var(--paper);border-radius:var(--r-lg);box-shadow:var(--lift-3);z-index:71;
+  opacity:0;pointer-events:none;transition:opacity .18s var(--out),transform .18s var(--out);overflow:hidden}
+.cmd.on{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
+.cmd-in{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--rule)}
+.cmd-in svg{width:15px;height:15px;stroke:var(--graphite-4);flex:0 0 15px}
+.cmd-in input{flex:1;border:0;outline:0;background:transparent;font-size:14px;min-width:0}
+.cmd-in input::placeholder{color:var(--graphite-4)}
+.cmd-in .esc{font-family:var(--mono);font-size:10px;color:var(--graphite-4);border:1px solid var(--rule-2);
+  border-radius:var(--r-xs);padding:1px 5px}
+.cmd-list{max-height:min(380px,54vh);overflow-y:auto;padding:6px}
+.cmd-grp{font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--graphite-4);
+  padding:8px 9px 4px}
+.cmd-row{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:var(--r-sm);width:100%;
+  text-align:left;cursor:pointer;font-size:13px}
+.cmd-row svg{width:14px;height:14px;stroke:var(--graphite-3);flex:0 0 14px}
+.cmd-row .fleet{font-size:11px;padding:2px 0;min-width:46px}
+.cmd-row .lb{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmd-row .rt{font-size:11px;color:var(--graphite-4);white-space:nowrap}
+.cmd-row.cur{background:var(--malachite-wash)}
+.cmd-row.cur svg{stroke:var(--malachite)}
+.cmd-row.cur .rt{color:var(--malachite-ink)}
+.cmd-void{padding:28px 16px;text-align:center;font-size:12.5px;color:var(--graphite-3)}
+.src-input{width:100%;background:var(--paper-2);border:0;outline:0;border-radius:var(--r-sm);
+  padding:9px 11px;font-size:12px;font-family:var(--mono);box-shadow:inset 0 0 0 1px var(--rule-2)}
+.src-input:focus{box-shadow:inset 0 0 0 1px var(--malachite-edge),0 0 0 2px var(--malachite-wash)}
+.src-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--rule);font-size:12.5px}
+.src-row:last-child{border-bottom:0}
+.src-row .nm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-row .nm small{display:block;color:var(--graphite-4);font-size:10.5px;font-family:var(--mono)}
+.src-row .ct{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--graphite-2);font-size:12px}
+.banner{display:flex;gap:10px;padding:11px 13px;border-radius:var(--r-sm);font-size:12.5px;
+  line-height:1.45;margin-bottom:14px;align-items:flex-start}
+.banner svg{width:15px;height:15px;flex:0 0 15px;margin-top:1px}
+.banner.warn{background:var(--caution-wash);color:var(--caution-ink);box-shadow:inset 0 0 0 1px rgba(251,179,21,.3)}
+.banner.warn svg{stroke:var(--caution)}
+.banner b{font-weight:650}
+.banner .act{margin-left:auto;flex:0 0 auto}
+
+/* ===================================================================
+   DIVERS
+   =================================================================== */
+.switchbar{display:inline-flex;background:var(--paper-3);border-radius:var(--r-sm);padding:2px;gap:2px}
+.switchbar button{padding:4px 10px;font-size:12px;border-radius:var(--r-xs);color:var(--graphite-2);
+  font-weight:450;transition:background .14s var(--out),color .14s}
+.switchbar button.on{background:var(--paper);color:var(--graphite);font-weight:550;box-shadow:var(--lift)}
+.switchbar button:not(.on):hover{color:var(--graphite)}
+.seek{display:flex;align-items:center;gap:7px;background:var(--paper-2);border-radius:var(--r-sm);
+  padding:0 10px;height:28px;min-width:188px;box-shadow:inset 0 0 0 1px var(--rule);transition:box-shadow .14s}
+.seek:focus-within{box-shadow:inset 0 0 0 1px var(--malachite-edge),0 0 0 2px var(--malachite-wash)}
+.seek input{border:0;outline:0;background:transparent;font-size:12px;flex:1;min-width:0}
+.seek svg{width:13px;height:13px;stroke:var(--graphite-4);flex:0 0 13px}
+.dial{display:flex;align-items:center;gap:10px;background:var(--paper);border-radius:var(--r);
+  box-shadow:var(--lift);padding:9px 13px}
+.dial label{font-size:11px;font-weight:550;color:var(--graphite-3);text-transform:uppercase;letter-spacing:.055em;white-space:nowrap}
+.dial input[type=range]{flex:1;min-width:110px;accent-color:var(--malachite);height:4px}
+.dial output{font-family:var(--mono);font-size:13px;font-weight:600;min-width:46px;text-align:right;font-variant-numeric:tabular-nums}
+.hail{display:flex;gap:9px;padding:10px 12px;background:var(--malachite-wash);border-radius:var(--r-sm);
+  font-size:12px;color:var(--malachite-ink);line-height:1.45;box-shadow:inset 0 0 0 1px var(--malachite-edge)}
+.hail svg{width:14px;height:14px;stroke:currentColor;flex:0 0 14px;margin-top:1px}
+.puff{position:fixed;z-index:90;background:var(--graphite);color:var(--paper);font-size:11px;
+  padding:5px 9px;border-radius:var(--r-sm);pointer-events:none;opacity:0;transition:opacity .12s;
+  max-width:280px;line-height:1.45;box-shadow:var(--lift-2)}
+.puff.on{opacity:1}
+.puff b{display:block;font-weight:600;margin-bottom:1px}
+.origin{font-size:10.5px;color:var(--graphite-4);font-family:var(--mono)}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+[data-ic]{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;line-height:0}
+.hidden{display:none!important}
+.burger{display:none}
+.ttlbox{min-width:0}
+.rail-scrim{position:fixed;inset:0;background:rgba(0,0,0,.42);opacity:0;pointer-events:none;
+  transition:opacity .24s var(--out);z-index:39}
+
+/* ===================================================================
+   RESPONSIVE
+   Trois paliers : poste de travail · tablette · mobile.
+   La densité « atelier » est tenue partout ; seule l'organisation change.
+   =================================================================== */
+
+/* ---- grand écran : on laisse respirer ---- */
+@media(min-width:1700px){ :root{--rail:244px;--pad:32px} }
+
+/* ---- tablette paysage : rail en icônes, moins de marge ---- */
+@media(max-width:1180px){
+  :root{--rail:60px;--pad:18px}
+  .mark-txt,.menu a .tx,.menu a .tally,.jump .tx,.jump .kbd,.tighten .tx,.menu-lbl{display:none}
+  .menu-lbl{display:block;height:10px;padding:5px 0;overflow:hidden;text-indent:-9999px}
+  .menu a,.tighten,.jump{justify-content:center;padding-left:0;padding-right:0}
+  .mark{justify-content:center;padding:14px 0 12px}
+  .tighten{display:none}
+  .rail-end{display:none}
+  .crest{grid-template-columns:1fr;gap:var(--s4)}
+  .q-item{grid-template-columns:54px 1fr 168px;gap:10px}
+}
+
+/* ---- tablette portrait ---- */
+@media(max-width:900px){
+  .crown h1{font-size:19px}
+  .panel-top{flex-wrap:wrap;row-gap:8px}
+  .panel-top .end{margin-left:auto}
+  .sieve{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+    scroll-snap-type:x proximity;padding-bottom:12px;margin-right:calc(var(--pad)*-1);padding-right:var(--pad)}
+  .sieve::-webkit-scrollbar{display:none}
+  .pick{scroll-snap-align:start;flex:0 0 auto}
+  .tally-txt{margin-left:0;flex:0 0 auto}
+  .week{grid-template-columns:46px repeat(7,minmax(88px,1fr))}
+}
+
+/* ---- mobile : le rail passe en tiroir, la mise en page se déplie ---- */
+@media(max-width:760px){
+  :root{--rail:232px;--pad:14px}
+  body{font-size:13.5px}
+  .rail{position:fixed;top:0;bottom:0;left:0;transform:translateX(-100%);
+    background:var(--paper);box-shadow:var(--lift-3);border-right:0}
+  .app.nav-open .rail{transform:none}
+  .app.nav-open .rail-scrim{opacity:1;pointer-events:auto}
+  .mark-txt,.menu a .tx,.menu a .tally,.jump .tx,.jump .kbd{display:block}
+  .menu a,.jump{justify-content:flex-start;padding-left:9px;padding-right:9px}
+  .menu a{min-height:44px}
+  .menu-lbl{display:block;height:auto;padding:14px 9px 5px;overflow:visible;text-indent:0}
+  .mark{justify-content:flex-start;padding:16px 14px 14px}
+  .rail-end{display:block}
+  .tighten{display:none}
+  .burger{display:inline-flex}
+  .crown{padding-top:10px}
+  .crown-row{align-items:center;gap:10px}
+  .crown h1{font-size:17px;letter-spacing:-.02em}
+  .crown .lede{display:none}
+  .crown-act{gap:6px}
+  .beacon{display:none}
+  .btn .lbl{display:none}
+  #reload{width:34px;padding:0;flex:0 0 34px}
+  .btn{min-height:34px}
+  .btn.icon{width:34px;flex:0 0 34px}
+  .rank{margin:18px 0 9px}
+  .row{gap:10px}
+  .panel{border-radius:var(--r)}
+  .panel-top{padding:11px 12px}
+  .panel-body{padding:12px}
+  /* bandeau disponibilité */
+  .crest{padding:14px;gap:14px}
+  .crest-num{font-size:36px}
+  .crest-keys{gap:12px}
+  /* file de triage : on empile compteur sous l'identité */
+  .q-item{grid-template-columns:50px 1fr;grid-template-areas:"f i" "m m";gap:8px 10px;padding:11px 12px}
+  .q-item .fleet{grid-area:f} .q-item .q-id{grid-area:i} .q-item .q-m{grid-area:m}
+  /* tuiles */
+  .stat{padding:11px 12px}
+  .stat-v{font-size:23px}
+  .strip-cell{flex:1 1 50%;min-width:50%}
+  .strip-cell:nth-child(odd)::before{display:none}
+  .strip-cell:nth-child(n+3)::after{content:"";position:absolute;left:12px;right:12px;top:0;height:1px;background:var(--rule)}
+  /* alertes */
+  .flag{padding:10px 12px;gap:9px}
+  .flag-b .bd{font-size:11px}
+  /* calendriers */
+  .day{min-height:58px;padding:3px 4px}
+  .dnum{font-size:11px;margin-bottom:1px}
+  .day.today .dnum::after{content:"•";padding:0 3px}
+  /* la pastille devient une puce : le libellé ne tient pas dans 50 px */
+  .day{flex-direction:row;flex-wrap:wrap;align-content:flex-start;gap:3px;padding:4px 3px}
+  .day .dnum{width:100%;margin-bottom:1px}
+  .chip{padding:0;border-left:0;background:transparent!important;width:7px;height:7px}
+  .chip .tx{display:none}
+  .chip .pip{display:block;width:7px;height:7px;flex:0 0 7px}
+  .k-prev .pip{background:var(--t-prev)} .k-corr .pip{background:var(--t-corr)}
+  .k-insp .pip{background:var(--t-insp)} .k-camp .pip{background:var(--t-camp)}
+  .chip-more{font-size:9px;padding:0;width:100%}
+  .month .dow{padding:5px 2px;font-size:9px;letter-spacing:.03em}
+  .cursor-lbl{min-width:96px;font-size:12px}
+  .week{grid-template-columns:40px repeat(7,minmax(76px,1fr));min-width:620px}
+  .week .wh{padding:5px 4px;font-size:9.5px}
+  .week .wh b{font-size:12.5px}
+  /* tableaux : défilement horizontal assumé */
+  .grid-wrap{max-height:460px;-webkit-overflow-scrolling:touch}
+  thead th,tbody td{padding:7px 9px}
+  .grid-wrap::after{content:""}
+  /* tiroir & palette plein écran */
+  .drawer{width:100vw}
+  .drawer-body{padding:14px 14px 40px}
+  .facts{grid-template-columns:1fr 1fr}
+  .cmd{top:0;left:0;width:100vw;transform:translateY(-8px) scale(1);border-radius:0;max-height:100vh}
+  .cmd.on{transform:none}
+  .cmd-list{max-height:calc(100vh - 56px)}
+  .cmd-in{padding:12px 14px}
+  .seek{min-width:0;flex:1}
+  .tools{gap:6px}
+  .dial{width:100%}
+  .cols{height:150px;gap:6px}
+  .col-k{font-size:9.5px}
+  .plot{grid-template-columns:minmax(74px,auto) 1fr minmax(48px,auto);gap:8px}
+}
+
+/* ---- très petit écran ---- */
+@media(max-width:400px){
+  .crest-num{font-size:30px}
+  .strip-cell{flex:1 1 100%;min-width:100%}
+  .strip-cell::before{display:none}
+  .strip-cell+.strip-cell::after{content:"";position:absolute;left:12px;right:12px;top:0;height:1px;background:var(--rule)}
+  .q-item{grid-template-columns:46px 1fr}
+}
+
+/* ---- pointeur grossier : cibles tactiles ---- */
+@media(pointer:coarse){
+  .btn{min-height:38px}
+  .btn.sm{min-height:34px}
+  .step{width:34px;height:34px}
+  .switchbar button{padding:8px 12px}
+  .pick select{height:34px}
+  .q-item,.flag,.day,.cmd-row{min-height:44px}
+  .tray button{padding:11px 5px}
+}
+
+/* ---- écran bas de plafond : on rogne les hauteurs max ---- */
+@media(max-height:720px){ .grid-wrap{max-height:400px} }
+@media print{.rail,.crown-act,.sieve,.tools,.drawer,.scrim,.cmd,.cmd-scrim{display:none!important}
+  .deck{overflow:visible;padding:0}.panel{break-inside:avoid;box-shadow:0 0 0 1px var(--rule-2)}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="rail">
+    <div class="mark">
+      <div class="mark-badge"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+      <div class="mark-txt"><b>Atelier</b><span>Pilotage maintenance</span></div>
+    </div>
+    <button class="jump" id="jump">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span class="tx">Aller à…</span><span class="kbd">⌘K</span>
+    </button>
+    <nav class="menu" id="menu">
+      <div class="menu-lbl">Pilotage</div>
+      <a data-p="exec" class="on"><span data-ic="home"></span><span class="tx">Accueil</span></a>
+      <a data-p="plan"><span data-ic="calendar"></span><span class="tx">Planning</span></a>
+      <div class="menu-lbl">Travaux</div>
+      <a data-p="prev"><span data-ic="wrench"></span><span class="tx">Préventif</span><span class="tally hz" id="t-prev" hidden></span></a>
+      <a data-p="corr"><span data-ic="alert"></span><span class="tx">Correctif</span><span class="tally hz" id="t-corr" hidden></span></a>
+      <a data-p="back"><span data-ic="stack"></span><span class="tx">Backlog</span><span class="tally ct" id="t-back" hidden></span></a>
+      <div class="menu-lbl">Support</div>
+      <a data-p="mag"><span data-ic="box"></span><span class="tx">Magasin</span><span class="tally ct" id="t-mag" hidden></span></a>
+      <a data-p="kpi"><span data-ic="chart"></span><span class="tx">Indicateurs</span></a>
+      <a data-p="hist"><span data-ic="clock"></span><span class="tx">Historique</span></a>
+    </nav>
+    <div class="rail-end">
+      <button class="tighten" id="tighten"><span data-ic="collapse"></span><span class="tx">Réduire</span></button>
+    </div>
+  </aside>
+
+  <div class="stage">
+    <header class="crown">
+      <div class="crown-row">
+        <button class="btn icon burger" id="burger" aria-label="Menu"><span data-ic="menu"></span></button>
+        <div class="ttlbox">
+          <h1 id="ttl">Accueil</h1>
+          <p class="lede" id="lede">Ce qui doit être traité aujourd'hui</p>
+        </div>
+        <div class="crown-act">
+          <button class="beacon" id="beacon"><span class="led" id="led"></span><span id="beacon-tx">Classeur Excel</span></button>
+          <button class="btn icon" id="theme" aria-label="Changer de thème" title="Thème"><span data-ic="auto"></span></button>
+          <button class="btn" id="reload"><span data-ic="reload"></span><span class="lbl">Actualiser</span></button>
+        </div>
+      </div>
+      <div class="sieve" id="sieve">
+        <div class="pick"><select id="s-site"></select><span class="caret" data-ic="chev-d"></span></div>
+        <div class="pick"><select id="s-dep"></select><span class="caret" data-ic="chev-d"></span></div>
+        <div class="pick"><select id="s-flotte"></select><span class="caret" data-ic="chev-d"></span></div>
+        <div class="pick"><select id="s-equip"></select><span class="caret" data-ic="chev-d"></span></div>
+        <div class="pick"><select id="s-resp"></select><span class="caret" data-ic="chev-d"></span></div>
+        <div class="pick"><select id="s-type"></select><span class="caret" data-ic="chev-d"></span></div>
+        <div class="pick"><select id="s-periode"></select><span class="caret" data-ic="chev-d"></span></div>
+        <button class="strike" id="s-clear" hidden>Réinitialiser</button>
+        <span class="tally-txt" id="s-count"></span>
+      </div>
+    </header>
+
+    <div class="deck" id="deck">
+      <!-- ============== ACCUEIL ============== -->
+      <section class="sheet on" id="sh-exec">
+        <div id="fallback-note"></div>
+        <div class="crest">
+          <div class="crest-fig">
+            <div>
+              <div class="crest-k">Disponibilité du parc</div>
+              <div class="crest-num" id="cr-num">—<span class="unit">%</span></div>
+              <div class="crest-sub" id="cr-sub"></div>
+            </div>
+          </div>
+          <div>
+            <div class="crest-split" id="cr-split"></div>
+            <div class="crest-keys" id="cr-keys"></div>
+          </div>
+        </div>
+
+        <div class="rank">À traiter — file de triage</div>
+        <div class="row lean" style="align-items:start">
+          <div class="panel">
+            <div class="panel-top">
+              <h2>File d'intervention</h2><span class="aside" id="q-sub"></span>
+              <div class="end">
+                <div class="switchbar" id="q-switch">
+                  <button data-q="urgent" class="on">Urgent</button>
+                  <button data-q="all">Parc suivi</button>
+                </div>
+              </div>
+            </div>
+            <div class="queue" id="queue"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-top"><h2>Alertes</h2><span class="aside">seuils du cahier des charges</span>
+              <div class="end"><span class="tag g-hz" id="fl-n">0</span></div></div>
+            <div class="flags" id="flags"></div>
+          </div>
+        </div>
+
+        <div class="rank">Indicateurs du parc</div>
+        <div class="row c4" id="kpi-lead"></div>
+        <div class="strip" id="kpi-strip" style="margin-top:14px"></div>
+
+        <div class="row c2" style="margin-top:14px">
+          <div class="panel">
+            <div class="panel-top"><h2>État du parc par site</h2><span class="aside">cliquez pour filtrer</span></div>
+            <div class="panel-body" id="by-site"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-top"><h2>Charge par catégorie</h2><span class="aside">tâches planifiées</span></div>
+            <div class="panel-body"><div class="plots" id="by-type"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============== PLANNING ============== -->
+      <section class="sheet" id="sh-plan">
+        <div class="panel">
+          <div class="panel-top"><h2>Vue annuelle</h2><span class="aside">cliquez un mois pour l'ouvrir en dessous</span>
+            <div class="end steer">
+              <button class="step" id="y-b" data-ic="chev-l"></button>
+              <span class="cursor-lbl" id="y-lbl">2026</span>
+              <button class="step" id="y-f" data-ic="chev-r"></button>
+            </div>
+          </div>
+          <div class="panel-body bare"><div class="year-wrap" id="year"></div></div>
+        </div>
+
+        <div class="row lean" style="margin-top:14px;align-items:start">
+          <div class="panel">
+            <div class="panel-top"><h2>Vue mensuelle</h2><span class="aside" id="m-sub"></span>
+              <div class="end steer">
+                <button class="step" id="m-b" data-ic="chev-l"></button>
+                <span class="cursor-lbl" id="m-lbl"></span>
+                <button class="step" id="m-f" data-ic="chev-r"></button>
+              </div>
+            </div>
+            <div class="panel-body bare"><div class="month" id="month"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-top"><h2>Vue hebdomadaire</h2><span class="aside" id="w-sub"></span>
+              <div class="end steer">
+                <button class="step" id="w-b" data-ic="chev-l"></button>
+                <span class="cursor-lbl" id="w-lbl"></span>
+                <button class="step" id="w-f" data-ic="chev-r"></button>
+              </div>
+            </div>
+            <div class="panel-body bare"><div class="week-wrap"><div class="week" id="week"></div></div></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Tâches de la semaine</h2><span class="aside" id="wl-sub"></span>
+            <div class="end"><div class="seek"><span data-ic="search"></span><input id="wl-q" placeholder="Filtrer…"></div></div>
+          </div>
+          <div class="grid-wrap"><table id="wl"></table></div>
+        </div>
+        <div class="keys" id="plan-keys" style="border-top:0;padding-top:14px"></div>
+      </section>
+
+      <!-- ============== PRÉVENTIF ============== -->
+      <section class="sheet" id="sh-prev">
+        <div class="tools">
+          <div class="dial">
+            <label for="seuil">Seuil d'alerte</label>
+            <input type="range" id="seuil" min="20" max="200" step="10" value="80">
+            <output id="seuil-out">80 h</output>
+          </div>
+          <span class="murmur" style="margin:0">Le cahier des charges indique 80 h, la feuille Parametres 70 h — ajustez pour voir l'effet.</span>
+        </div>
+        <div class="row c5" id="prev-kpi"></div>
+        <div class="row lean-r" style="margin-top:14px;align-items:start">
+          <div class="panel">
+            <div class="panel-top"><h2>État des échéances</h2><span class="aside">parc suivi</span></div>
+            <div class="panel-body" id="prev-ring"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-top"><h2>Réalisé vs planifié</h2><span class="aside">interventions préventives par mois</span></div>
+            <div class="panel-body" id="prev-rvp"></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Rapport PM</h2><span class="aside">heures restantes et prochain service</span>
+            <div class="end">
+              <div class="switchbar" id="prev-switch">
+                <button data-f="all" class="on">Tous</button>
+                <button data-f="late">Dépassés</button>
+                <button data-f="soon">Sous seuil</button>
+                <button data-f="ok">Cycle normal</button>
+              </div>
+              <button class="btn sm dl" id="prev-dl" hidden><span data-ic="down"></span>CSV</button>
+            </div>
+          </div>
+          <div class="grid-wrap"><table id="prev-tbl"></table></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Relevé des entretiens</h2><span class="aside">plan préventif</span></div>
+          <div class="grid-wrap"><table id="prev-pm"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== CORRECTIF ============== -->
+      <section class="sheet" id="sh-corr">
+        <div class="rank">Correctifs</div>
+        <div class="row c5" id="corr-kpi"></div>
+        <div class="rank">Anomalies</div>
+        <div class="row c4" id="ano-kpi"></div>
+        <div class="row c2" style="margin-top:14px;align-items:start">
+          <div class="panel">
+            <div class="panel-top"><h2>Pareto des défaillances</h2><span class="aside">cliquez un système pour filtrer</span></div>
+            <div class="panel-body"><div class="plots" id="pareto"></div><div class="murmur" id="pareto-note"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-top"><h2>Sévérité</h2></div>
+            <div class="panel-body"><div class="plots" id="ano-sev"></div></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Registre des anomalies</h2><span class="aside" id="ano-sub"></span>
+            <div class="end"><button class="btn sm" id="ano-reset" hidden>Tout afficher</button>
+            <button class="btn sm dl" id="ano-dl" hidden><span data-ic="down"></span>CSV</button></div></div>
+          <div class="grid-wrap"><table id="ano-tbl"></table></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Planning correctif</h2></div>
+          <div class="grid-wrap"><table id="corr-tbl"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== BACKLOG ============== -->
+      <section class="sheet" id="sh-back">
+        <div class="row c4" id="back-kpi"></div>
+        <div class="row c2" style="margin-top:14px;align-items:start">
+          <div class="panel"><div class="panel-top"><h2>Vieillissement</h2></div>
+            <div class="panel-body"><div class="plots" id="back-age"></div></div></div>
+          <div class="panel"><div class="panel-top"><h2>Par origine</h2></div>
+            <div class="panel-body"><div class="plots" id="back-org"></div></div></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Activités en attente</h2>
+            <div class="end"><button class="btn sm dl" id="back-dl" hidden><span data-ic="down"></span>CSV</button></div></div>
+          <div class="grid-wrap"><table id="back-tbl"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== MAGASIN ============== -->
+      <section class="sheet" id="sh-mag">
+        <div class="row c4" id="mag-kpi"></div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Travaux bloqués faute de pièces</h2><span class="aside">toutes origines</span></div>
+          <div class="grid-wrap"><table id="mag-blk"></table></div>
+        </div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Pièces de rechange</h2>
+            <div class="end"><button class="btn sm dl" id="mag-dl" hidden><span data-ic="down"></span>CSV</button></div></div>
+          <div class="grid-wrap"><table id="mag-tbl"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== INDICATEURS ============== -->
+      <section class="sheet" id="sh-kpi">
+        <div class="panel">
+          <div class="panel-top"><h2>Tableau de bord consolidé</h2><span class="aside">cahier des charges</span>
+            <div class="end"><button class="btn sm dl" id="kpi-dl" hidden><span data-ic="down"></span>CSV</button>
+            <button class="btn sm" id="kpi-print"><span data-ic="print"></span>Imprimer</button></div></div>
+          <div class="grid-wrap" style="max-height:none"><table id="kpi-tbl"></table></div>
+        </div>
+        <div class="row c2" style="margin-top:14px;align-items:start">
+          <div class="panel"><div class="panel-top"><h2>Immobilisations</h2></div>
+            <div class="grid-wrap"><table id="dispo-tbl"></table></div></div>
+          <div class="panel"><div class="panel-top"><h2>Source des données</h2>
+              <div class="end"><button class="btn sm" id="src-open">Configurer</button></div></div>
+            <div class="panel-body" id="src-panel"></div></div>
+          <div class="panel"><div class="panel-top"><h2>Synthèse du parc</h2></div>
+            <div class="panel-body"><div class="tray" id="synth"></div>
+              <div style="margin-top:16px"><div class="rank" style="margin:0 0 10px">Modèles les plus représentés</div>
+              <div class="plots" id="top-mod"></div></div></div></div>
+        </div>
+      </section>
+
+      <!-- ============== HISTORIQUE ============== -->
+      <section class="sheet" id="sh-hist">
+        <div class="row c4" id="hist-kpi"></div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-top"><h2>Historique des interventions</h2>
+            <span class="aside">préventif · correctif · backlog · anomalies · disponibilité</span>
+            <div class="end"><div class="seek"><span data-ic="search"></span><input id="hist-q" placeholder="Engin, travaux, technicien…"></div>
+            <button class="btn sm dl" id="hist-dl" hidden><span data-ic="down"></span>CSV</button></div></div>
+          <div class="grid-wrap" style="max-height:620px"><table id="hist-tbl"></table></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="rail-scrim" id="rail-scrim"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-top">
+    <span class="fleet" id="dr-fleet">—</span>
+    <div class="drawer-id"><h3 id="dr-name">—</h3><div class="meta" id="dr-meta"></div></div>
+    <button class="btn icon sm" id="dr-close" aria-label="Fermer"><span data-ic="x"></span></button>
+  </div>
+  <div class="drawer-body" id="dr-body"></div>
+</aside>
+
+<div class="cmd-scrim" id="src-scrim"></div>
+<div class="cmd" id="src-dlg" role="dialog" aria-label="Source des données">
+  <div class="cmd-in" style="gap:8px"><span data-ic="layers"></span>
+    <b style="font-size:14px;flex:1">Source des données</b>
+    <button class="btn sm icon" id="src-close" aria-label="Fermer"><span data-ic="x"></span></button></div>
+  <div style="padding:14px 15px 16px">
+    <div class="switchbar" id="src-mode" style="margin-bottom:12px">
+      <button data-m="gsheets">Google Sheets</button>
+      <button data-m="embedded">Classeur Excel</button>
+    </div>
+    <label style="display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--graphite-3);margin-bottom:6px">
+      Lien du classeur publié sur le web</label>
+    <input id="src-url" class="src-input" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX-…/pubhtml">
+    <div class="murmur" style="margin-top:8px">
+      Dans Google Sheets : <b>Fichier → Partager → Publier sur le web</b>, choisir <b>Document entier</b>, puis coller le lien obtenu ici.
+      Collez le lien <code>/pubhtml</code> ou <code>/pub</code> — les deux fonctionnent.</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn key" id="src-apply">Appliquer et recharger</button>
+      <button class="btn" id="src-reset">Lien d'origine</button>
+    </div>
+    <div id="src-msg" class="murmur" style="margin-top:10px"></div>
+  </div>
+</div>
+<div class="cmd-scrim" id="cmd-scrim"></div>
+<div class="cmd" id="cmd" role="dialog" aria-label="Aller à">
+  <div class="cmd-in">
+    <span data-ic="search"></span>
+    <input id="cmd-q" placeholder="Numéro d'engin, page, site…" autocomplete="off" spellcheck="false">
+    <span class="esc">esc</span>
+  </div>
+  <div class="cmd-list" id="cmd-list"></div>
+</div>
+<div class="puff" id="puff"></div>
+<script>
+/* =====================================================================
+   CONFIGURATION — à compléter à l'étape Google Sheets
+   ===================================================================== */
+const DEFAULT_PUB='2PACX-1vSQC2GzusROoMbou0a5wCwB_uS6rl44Kzj_xyIzrQSMslcpKEzaQOnPlmPJi5uAwHONH7wQwmUgL9XO';
+const CONFIG = {
+  source:'gsheets',             // 'gsheets' | 'embedded'
+  pubId:DEFAULT_PUB,            // identifiant du classeur PUBLIÉ sur le web (/d/e/2PACX-…)
+  refreshMs:5*60*1000,          // auto-actualisation
+  headerRow:3,                  // ligne d'en-têtes par défaut (sinon détectée)
+  seuilAlerteH:80,              // « PM à faire sous X h » (cahier des charges)
+  seuilImmobH:72,               // immobilisation > X h
+  seuilBacklogJ:30              // backlog vieillissant > X jours
+};
+try{ const sv=JSON.parse(localStorage.getItem('atelier-source')||'null');
+  if(sv){ if(sv.pubId)CONFIG.pubId=sv.pubId; if(sv.source)CONFIG.source=sv.source; }
+}catch(e){}
+
+/* onglets attendus — reconnus par motif sur le libellé réel, pas par égalité stricte */
+const TAB_MATCH=[
+  ['parc',       /parc|equipement/,        'Parc des équipements'],
+  ['pm',         /prevent/,                'Plan préventif'],
+  ['correctif',  /correctif/,              'Planning correctif'],
+  ['backlog',    /backlog/,                'Backlog'],
+  ['historique', /historique/,             'Historique'],
+  ['anomalies',  /anomalie/,               'Anomalies'],
+  ['pieces',     /piece/,                  'Pièces'],
+  ['dispo',      /disponibilit|immobilis/, 'Disponibilité']
+];
+/* colonnes témoins : servent à repérer la ligne d'en-têtes dans chaque onglet */
+const TAB_PROBE={
+  parc:['id fleet','type equipement','statut equipement','index actuel','intervalle h'],
+  pm:['id intervention','id fleet','type entretien','index cible entretien','statut intervention'],
+  correctif:['id intervention','travaux a realiser','date planifiee','statut intervention','source'],
+  backlog:['id activite','date creation','type activite','statut backlog','origine'],
+  historique:['date realisation','travaux realises','techniciens','index avant','valide par'],
+  anomalies:['id anomalie','description anomalie','systeme concerne','severite','statut anomalie'],
+  pieces:['id piece','designation','qte requise','qte stock','statut'],
+  dispo:['id fleet','statut actuel','date arret','cause arret','duree arret jours']
+};
+
+/* ---------- icônes (tracées, 24×24, stroke) ---------- */
+const ICONS={
+ home:'M3 10.2 12 3l9 7.2V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z',
+ calendar:'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM4 9h16M8 3v4M16 3v4',
+ wrench:'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z',
+ alert:'M10.3 3.9 2.1 18a2 2 0 0 0 1.7 3h16.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v5M12 17.5v.01',
+ stack:'M4 7h16M4 12h16M4 17h10',
+ box:'m21 8-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8',
+ chart:'M4 20V10M10 20V4M16 20v-7M22 20H2',
+ clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.2 1.9',
+ collapse:'m14 6-6 6 6 6',
+ reload:'M20 11A8 8 0 0 0 6.3 5.7L3 9M3 9V4M3 9h5M4 13a8 8 0 0 0 13.7 5.3L21 15M21 15v5M21 15h-5',
+ search:'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5',
+ down:'M12 3v12M7.5 11 12 15.5 16.5 11M4 20h16',
+ print:'M7 8V3h10v5M7 18H5a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2M7 14h10v7H7z',
+ x:'M6 6l12 12M18 6 6 18',
+ 'chev-l':'m14 6-6 6 6 6','chev-r':'m10 6 6 6-6 6','chev-d':'m6 9 6 6 6-6','chev-r-sm':'m9 5 7 7-7 7',
+ check:'m4 12.5 5 5L20 6.5',
+ gauge:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 12l4-4',
+ truck:'M3 7a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v9H3zM14 10h3.6a1 1 0 0 1 .9.5L21 15v1h-7zM7 19.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17.5 19.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+ ban:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM5.6 5.6l12.8 12.8',
+ bell:'M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6M13.7 20a2 2 0 0 1-3.4 0',
+ flag:'M5 21V4h13l-2.5 4L18 12H5',
+ pin:'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+ target:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
+ eye:'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+ spark:'M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1',
+ cart:'M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.5a1 1 0 0 0 1-.8L20 8H6M9 20.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM17 20.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
+ info:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8v.01',
+ void:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 8.5l7 7M15.5 8.5l-7 7',
+ pause:'M9 5v14M15 5v14',
+ play:'M7 4.5 19 12 7 19.5z',
+ refresh2:'M4 12a8 8 0 0 1 13.7-5.7L21 9M21 9V4M21 9h-5',
+ layers:'m12 3 9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5',
+ menu:'M4 7h16M4 12h16M4 17h16',
+ sun:'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
+ moon:'M20 14.3A8.5 8.5 0 0 1 9.7 4 8.5 8.5 0 1 0 20 14.3z',
+ auto:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 3v18a9 9 0 0 0 0-18z'
+};
+function ic(n,cls){
+  const d=ICONS[n]; if(!d) return '';
+  return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"${cls?` class="${cls}"`:''}><path d="${d}"/></svg>`;
+}
+function paintIcons(root){
+  (root||document).querySelectorAll('[data-ic]').forEach(el=>{
+    if(el.dataset.done) return;
+    el.innerHTML=ic(el.dataset.ic);     // on remplit, on ne remplace pas : l'élément hôte garde son id
+    el.dataset.done='1';
+  });
+}
+
+/* ---------- utilitaires ---------- */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MOIS_A=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+const JOURS=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nf=n=>(n==null||isNaN(n))?'—':new Intl.NumberFormat('fr-FR').format(Math.round(n));
+const nf1=n=>(n==null||isNaN(n))?'—':new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1}).format(n);
+function norm(s){return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function num(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number') return isFinite(v)?v:null;
+  const s=String(v).replace(/\s| /g,'').replace(/,/g,'.').replace(/[^\d.\-+eE]/g,'');
+  const n=parseFloat(s); return isFinite(n)?n:null;
+}
+function parseDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date) return isNaN(v)?null:v;
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);           if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);  // JJ/MM/AAAA
+  if(m){let y=+m[3]; if(y<100)y+=2000; return new Date(y,+m[2]-1,+m[1]);}
+  m=s.match(/^Date\((\d+),(\d+),(\d+)/);               if(m) return new Date(+m[1],+m[2],+m[3]);
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+const ymd=d=>d?d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'):'';
+const fdate=d=>d?String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear():'—';
+const TODAY=(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate());})();
+const daysBetween=(a,b)=>Math.round((b-a)/86400000);
+function startOfWeek(d){const x=new Date(d);const w=(x.getDay()+6)%7;x.setDate(x.getDate()-w);x.setHours(0,0,0,0);return x;}
+
+function pick(row,...names){
+  if(!row) return null;
+  if(!row.__idx){const idx={};for(const k in row)idx[norm(k)]=row[k];
+    Object.defineProperty(row,'__idx',{value:idx,enumerable:false});}
+  for(const n of names){
+    const key=norm(n);
+    if(row.__idx[key]!=null&&row.__idx[key]!=='') return row.__idx[key];
+    for(const k in row.__idx){if(k.startsWith(key)&&row.__idx[k]!=null&&row.__idx[k]!=='')return row.__idx[k];}
+  }
+  return null;
+}
+function parseCSV(text){
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}
+    else if(c==='"')q=true;
+    else if(c===','){row.push(cur);cur='';}
+    else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+    else if(c!=='\r')cur+=c;}
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+function rowsToObjects(rows,headerRow){
+  const hi=headerRow-1; if(rows.length<=hi) return [];
+  const hdr=rows[hi].map((h,i)=>(h&&h.trim())?h.trim():'col'+i);
+  const out=[];
+  for(let r=hi+1;r<rows.length;r++){
+    const o={};let any=false;
+    for(let c=0;c<hdr.length;c++){const v=(rows[r][c]??'').trim();o[hdr[c]]=v;if(v!=='')any=true;}
+    if(any) out.push(o);}
+  return out;
+}
+const STATE={lastSync:null,syncing:false,error:null,mode:'embedded',diag:[],tabs:null};
+const PUB = id => `https://docs.google.com/spreadsheets/d/e/${id}`;
+
+/* --- 1. découverte des onglets : la page publiée porte la liste gid <-> nom --- */
+async function discoverTabs(){
+  const res=await fetch(PUB(CONFIG.pubId)+'/pubhtml',{cache:'no-store'});
+  if(!res.ok) throw new Error('page publiée : HTTP '+res.status);
+  const html=await res.text();
+  const found=[];
+  try{
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    doc.querySelectorAll('[id^="sheet-button-"]').forEach(el=>{
+      const m=(el.id||'').match(/sheet-button-(-?\d+)/);
+      if(m) found.push({gid:m[1],name:(el.textContent||'').trim()});
+    });
+  }catch(e){}
+  if(!found.length){                       /* secours : lecture brute du balisage */
+    const re=/id="sheet-button-(-?\d+)"[^>]*>(?:\s*<[^>]*>)*\s*([^<]{1,80})/g; let m;
+    while((m=re.exec(html))) found.push({gid:m[1],name:m[2].trim()});
+  }
+  const seen=new Set(), uniq=[];
+  for(const t of found){ if(t.gid&&!seen.has(t.gid)){seen.add(t.gid);uniq.push(t);} }
+  if(!uniq.length) throw new Error("aucun onglet listé — le classeur est-il publié en entier ?");
+  return uniq;
+}
+
+/* --- 2. repérage de la vraie ligne d'en-têtes (tolère les lignes de titre) --- */
+function findHeaderRow(rows,key){
+  const want=TAB_PROBE[key]||[]; let best=-1,bestScore=0;
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const cells=(rows[i]||[]).map(norm).filter(Boolean);
+    if(!cells.length) continue;
+    let score=0;
+    for(const w of want) if(cells.some(c=>c===w||c.startsWith(w)||(w.startsWith(c)&&c.length>5))) score++;
+    if(score>bestScore){bestScore=score;best=i;}
+  }
+  return bestScore>=2 ? best+1 : CONFIG.headerRow;
+}
+
+/* --- 3. lecture d'un onglet publié --- */
+async function fetchGid(gid){
+  const url=PUB(CONFIG.pubId)+`/pub?gid=${encodeURIComponent(gid)}&single=true&output=csv`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const txt=await res.text();
+  if(/^\s*<(?:!doctype|html)/i.test(txt)) throw new Error('réponse HTML — onglet non publié');
+  return parseCSV(txt);
+}
+
+async function loadData(){
+  if(CONFIG.source!=='gsheets'||!CONFIG.pubId){
+    STATE.mode='embedded'; STATE.diag=[]; return JSON.parse(JSON.stringify(EMBEDDED));
+  }
+  const diag=[], out={};
+  let tabs;
+  try{ tabs=await discoverTabs(); STATE.tabs=tabs; }
+  catch(e){
+    STATE.mode='embedded';
+    STATE.diag=[{key:'',name:'Découverte des onglets',gid:'',rows:0,err:e.message}];
+    throw Object.assign(new Error(e.message),{fallback:true});
+  }
+  const used=new Set();
+  for(const [key,re,lbl] of TAB_MATCH){
+    const hit=tabs.find(t=>!used.has(t.gid)&&re.test(norm(t.name)));
+    if(!hit){ out[key]=[]; diag.push({key,name:lbl,gid:'',rows:0,err:'onglet introuvable'}); continue; }
+    used.add(hit.gid);
+    try{
+      const rows=await fetchGid(hit.gid);
+      const hr=findHeaderRow(rows,key);
+      const objs=rowsToObjects(rows,hr);
+      out[key]=objs;
+      diag.push({key,name:hit.name,gid:hit.gid,rows:objs.length,header:hr,err:null});
+    }catch(e){ out[key]=[]; diag.push({key,name:hit.name,gid:hit.gid,rows:0,err:e.message}); }
+  }
+  if(!diag.filter(d=>!d.err).length){
+    STATE.mode='embedded'; STATE.diag=diag;
+    throw Object.assign(new Error('aucun onglet lisible'),{fallback:true});
+  }
+  tabs.filter(t=>!used.has(t.gid)).forEach(t=>
+    diag.push({key:'',name:t.name,gid:t.gid,rows:0,err:'onglet non utilisé par le dashboard'}));
+  STATE.mode='gsheets'; STATE.diag=diag;
+  return out;
+}
+
+/* ---------- DONNÉES INTÉGRÉES (classeur Excel) ---------- */
+const EMBEDDED = {"parc":[{"ID Fleet":741.0,"Type équipement":"Engin minier","Catégorie / Modèle":"ADT-CAT 740","Site / Département":"KATONTO/CMCK","Statut équipement":"Disponible"},{"ID Fleet":744.0,"Type équipement":"Engin minier","Catégorie / Modèle":"ADT-CAT 740","Site / Département":"KAMOA/CMCK","Statut équipement":"Immobilisé"},{"ID Fleet":747.0,"Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Index actuel (h)":21302.0,"Date index":"2026-11-16","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-05","Dernier entretien (h)":21188.0,"Type dernier entretien H":1000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":21688,"Date Planifié Prévu":"2026-12-06","Heures restantes":386,"Alerte maintenance":"OK"},{"ID Fleet":748.0,"Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Index actuel (h)":22524.0,"Date index":"2026-11-06","Statut équipement":"Disponible","Date Dernier entretien":"2026-08-01","Dernier entretien (h)":21992.0,"Type dernier entretien H":2000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":22492,"Date Planifié Prévu":"2026-09-01","Heures restantes":-32,"Alerte maintenance":"DÉPASSÉ"},{"ID Fleet":749.0,"Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Statut équipement":"En attente pièces","Date Dernier entretien":"2026-06-17","Dernier entretien (h)":18615.0,"Type dernier entretien H":500.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":19115,"Date Planifié Prévu":"2026-07-18"},{"ID Fleet":"74-10","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-10-20","Dernier entretien (h)":20342.0,"Type dernier entretien H":2000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":20842,"Date Planifié Prévu":"2026-11-20"},{"ID Fleet":"74-11","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-09","Dernier entretien (h)":20995.0,"Type dernier entretien H":1000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":21495,"Date Planifié Prévu":"2026-12-10"},{"ID Fleet":"74-12","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-12","Dernier entretien (h)":24602.0,"Type dernier entretien H":500.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":25102,"Date Planifié Prévu":"2026-12-13"},{"ID Fleet":"74-13","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Dernier entretien (h)":18216.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":18716},{"ID Fleet":"74-14","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-06-23","Dernier entretien (h)":17419.0,"Type dernier entretien H":1000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":17919,"Date Planifié Prévu":"2026-07-24"},{"ID Fleet":"74-15","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-VOLVO A45G","Site / Département":"KCC/CMCK","Index actuel (h)":13453.0,"Date index":"2026-11-16","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-09","Dernier entretien (h)":13377.0,"Type dernier entretien H":1500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":13627,"Date Planifié Prévu":"2026-11-24","Heures restantes":174,"Alerte maintenance":"OK"},{"ID Fleet":"74-16","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-VOLVO A45G","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-12","Dernier entretien (h)":12688.0,"Type dernier entretien H":500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":12938,"Date Planifié Prévu":"2026-11-27"},{"ID Fleet":"74-17","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-VOLVO A45G","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-13","Dernier entretien (h)":13179.0,"Type dernier entretien H":1000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":13429,"Date Planifié Prévu":"2026-11-28"},{"ID Fleet":"74-18","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-VOLVO A45G","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-12","Dernier entretien (h)":13618.0,"Type dernier entretien H":1500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":13868,"Date Planifié Prévu":"2026-11-27"},{"ID Fleet":"74-19","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-09-30","Dernier entretien (h)":7337.0,"Type dernier entretien H":1000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":7837,"Date Planifié Prévu":"2026-10-31"},{"ID Fleet":"74-20","Type équipement":"Engin minier","Catégorie / Modèle":"ADT-BELL B45E","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-10-16","Dernier entretien (h)":8033.0,"Type dernier entretien H":1000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":8533,"Date Planifié Prévu":"2026-11-16"},{"ID Fleet":663.0,"Type équipement":"Engin minier","Catégorie / Modèle":"DZ-KOMATSU D155","Site / Département":"KATONTO/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-04-17","Dernier entretien (h)":15457.0,"Type dernier entretien H":500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":15707,"Date Planifié Prévu":"2026-05-18"},{"ID Fleet":664.0,"Type équipement":"Engin minier","Catégorie / Modèle":"DZ-KOMATSU D155AX-6","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Heure / Jour Opération":16.0},{"ID Fleet":665.0,"Type équipement":"Engin minier","Catégorie / Modèle":"DZ-KOMATSU D155A-6","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé","Date Dernier entretien":"2026-07-07","Dernier entretien (h)":15872.0,"Type dernier entretien H":2000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":16122,"Date Planifié Prévu":"2026-08-07"},{"ID Fleet":667.0,"Type équipement":"Engin minier","Catégorie / Modèle":"DZ-KOMATSU D155A-6","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Dernier entretien (h)":15719.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":15969},{"ID Fleet":668.0,"Type équipement":"Engin minier","Catégorie / Modèle":"DZ-KOMATSU D155A-6","Site / Département":"KCC/CMCK","Index actuel (h)":18057.0,"Date index":"2026-11-13","Statut équipement":"Disponible","Date Dernier entretien":"2026-08-31","Dernier entretien (h)":17696.0,"Type dernier entretien H":1500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":17946,"Date Planifié Prévu":"2026-09-15","Heures restantes":-111,"Alerte maintenance":"DÉPASSÉ"},{"ID Fleet":669.0,"Type équipement":"Engin minier","Catégorie / Modèle":"DZ-DRESTA TD-25M","Site / Département":"KCC/CMCK","Index actuel (h)":7998.0,"Date index":"2026-11-08","Statut équipement":"Disponible","Date Dernier entretien":"2026-05-19","Dernier entretien (h)":7817.0,"Type dernier entretien H":500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":8067,"Date Planifié Prévu":"2026-06-03","Heures restantes":69,"Alerte maintenance":"À PLANIFIER"},{"ID Fleet":"69-10","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR SDLG RS8140","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé","Date Dernier entretien":"2025-01-15","Dernier entretien (h)":10190.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":10440,"Date Planifié Prévu":"2025-02-15"},{"ID Fleet":"69-11","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR SDLG RS8140","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Heure / Jour Opération":8.0},{"ID Fleet":"69-12","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR SDLG RS8140","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-11","Dernier entretien (h)":13063.0,"Type dernier entretien H":2000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":13313,"Date Planifié Prévu":"2026-12-12"},{"ID Fleet":"69-13","Type équipement":"Engin minier","Site / Département":"KCC/CMCK","Statut équipement":"En attente pièces","Heure / Jour Opération":8.0},{"ID Fleet":"69-14","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR-VOLVO SB 160","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé","Date Dernier entretien":"2026-08-26","Dernier entretien (h)":3039.0,"Type dernier entretien H":1000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":3289,"Date Planifié Prévu":"2026-09-10"},{"ID Fleet":"69-15","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR-BOOMAG","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé","Heure / Jour Opération":8.0},{"ID Fleet":"69-16","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR-BOOMAG","Site / Département":"KCC/CMCK","Statut équipement":"En attente pièces","Heure / Jour Opération":8.0},{"ID Fleet":"69-17","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR-VOLVO SB 160","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-02-24","Dernier entretien (h)":3546.0,"Type dernier entretien H":1500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":3796,"Date Planifié Prévu":"2026-03-11"},{"ID Fleet":"69-18","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR-VOLVO SB 160","Site / Département":"KCC/CMCK","Index actuel (h)":2713.0,"Date index":"2026-11-07","Statut équipement":"Disponible","Dernier entretien (h)":2435.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":2685,"Heures restantes":-28,"Alerte maintenance":"DÉPASSÉ"},{"ID Fleet":"69-19","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR-SDLG","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-08-11","Dernier entretien (h)":8242.0,"Type dernier entretien H":2000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":8492,"Date Planifié Prévu":"2026-09-11"},{"ID Fleet":"69-20","Type équipement":"Engin minier","Catégorie / Modèle":"COMPACTOR-SDLG","Site / Département":"KCC/CMCK","Index actuel (h)":3062.4,"Date index":"2026-11-08","Statut équipement":"Disponible","Dernier entretien (h)":2705.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":2955,"Heures restantes":-107.4,"Alerte maintenance":"DÉPASSÉ"},{"ID Fleet":673.0,"Type équipement":"Engin minier","Catégorie / Modèle":"GRADER-JHONDEERE 770G","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-04-13","Dernier entretien (h)":14948.0,"Type dernier entretien H":500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":15198,"Date Planifié Prévu":"2026-05-14"},{"ID Fleet":674.0,"Type équipement":"Engin minier","Catégorie / Modèle":"GRADER-KOMATSU G655-5","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-08-17","Dernier entretien (h)":14318.0,"Type dernier entretien H":2000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":14568,"Date Planifié Prévu":"2026-09-01"},{"ID Fleet":675.0,"Type équipement":"Engin minier","Catégorie / Modèle":"GRADER-JHONDEERE 770G","Site / Département":"KCC/CMCK","Statut équipement":"En attente pièces"},{"ID Fleet":676.0,"Type équipement":"Engin minier","Catégorie / Modèle":"GRADER-JHONDEERE 772G","Site / Département":"KCC/CMCK","Index actuel (h)":11393.9,"Date index":"2026-11-14","Statut équipement":"Immobilisé","Date Dernier entretien":"2026-10-29","Dernier entretien (h)":11292.0,"Type dernier entretien H":1250.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":11542,"Date Planifié Prévu":"2026-11-13","Heures restantes":148.1,"Alerte maintenance":"OK"},{"ID Fleet":677.0,"Type équipement":"Engin minier","Catégorie / Modèle":"GRADER-CAT","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Heure / Jour Opération":8.0},{"ID Fleet":622.0,"Type équipement":"Engin minier","Catégorie / Modèle":"LOADER VOLVO-L250H","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-04-24","Dernier entretien (h)":24211.0,"Type dernier entretien H":250.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":24461,"Date Planifié Prévu":"2026-05-09"},{"ID Fleet":625.0,"Type équipement":"Engin minier","Catégorie / Modèle":"LOADER- KOMATSU","Site / Département":"KCC/CMCK","Statut équipement":"En attente pièces"},{"ID Fleet":627.0,"Type équipement":"Engin minier","Catégorie / Modèle":"LOADER VOLVO-L180H","Site / Département":"KATONTO/CMCK","Index actuel (h)":17910.0,"Date index":"2026-11-13","Statut équipement":"Disponible","Dernier entretien (h)":17723.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":17973,"Heures restantes":63,"Alerte maintenance":"À PLANIFIER"},{"ID Fleet":628.0,"Type équipement":"Engin minier","Catégorie / Modèle":"LOADER-CATERPILLAR","Site / Département":"KCC/CMCK","Index actuel (h)":6522.0,"Date index":"2026-11-15","Statut équipement":"Disponible","Dernier entretien (h)":6138.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":6388,"Heures restantes":-134,"Alerte maintenance":"DÉPASSÉ"},{"ID Fleet":629.0,"Type équipement":"Engin minier","Catégorie / Modèle":"LOADER VOLVO-L180H","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-07-31","Dernier entretien (h)":6340.0,"Type dernier entretien H":1000.0,"Intervalle (h)":500.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":6840,"Date Planifié Prévu":"2026-08-31"},{"ID Fleet":645.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ KOMATSU PC 450","Site / Département":"KATONTO/CMCK","Statut équipement":"Immobilisé","Heure / Jour Opération":8.0},{"ID Fleet":646.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ DOOSAN DX 340","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé","Date Dernier entretien":"2026-04-17","Dernier entretien (h)":13164.0,"Type dernier entretien H":1000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":13414,"Date Planifié Prévu":"2026-05-18"},{"ID Fleet":647.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ KOMATSU PC 500","Site / Département":"KATONTO/CMCK","Statut équipement":"Immobilisé","Date Dernier entretien":"2026-05-14","Type dernier entretien H":1000.0,"Intervalle (h)":250.0},{"ID Fleet":648.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ DOOSAN DX 340","Site / Département":"DIKAPA/CMCK","Statut équipement":"Disponible","Heure / Jour Opération":8.0},{"ID Fleet":649.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ DOOSAN DX 340","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé"},{"ID Fleet":650.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ DOOSAN DX 340","Site / Département":"KATONTO/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-04","Dernier entretien (h)":9617.0,"Type dernier entretien H":1500.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":9867,"Date Planifié Prévu":"2026-12-05"},{"ID Fleet":651.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ VOLVO EC 480D","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-07-14","Dernier entretien (h)":18273.0,"Type dernier entretien H":2000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":18523,"Date Planifié Prévu":"2026-08-14"},{"ID Fleet":652.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ VOLVO EC 480D","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé","Date Dernier entretien":"2026-03-27","Dernier entretien (h)":16744.0,"Type dernier entretien H":750.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":16994,"Date Planifié Prévu":"2026-04-27"},{"ID Fleet":653.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ VOLVO EC 480D","Site / Département":"KCC/CMCK","Statut équipement":"Immobilisé","Date Dernier entretien":"2026-09-09","Dernier entretien (h)":21150.0,"Type dernier entretien H":1000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":21400,"Date Planifié Prévu":"2026-09-24"},{"ID Fleet":654.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ DOOSAN DX 340","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-06-29","Dernier entretien (h)":5989.0,"Type dernier entretien H":2000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":6239,"Date Planifié Prévu":"2026-07-30"},{"ID Fleet":655.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ CAT","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-09-21","Dernier entretien (h)":5617.0,"Type dernier entretien H":1500.0,"Intervalle (h)":500.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":6117,"Date Planifié Prévu":"2026-11-22"},{"ID Fleet":656.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ VOLVO EC 480D","Site / Département":"KCC/CMCK","Index actuel (h)":9110.8,"Date index":"2026-11-11","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-10","Dernier entretien (h)":9050.0,"Type dernier entretien H":1000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":9300,"Date Planifié Prévu":"2026-11-25","Heures restantes":189.2,"Alerte maintenance":"OK"},{"ID Fleet":657.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ VOLVO EC 750D","Site / Département":"KCC/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-11-11","Dernier entretien (h)":6100.0,"Type dernier entretien H":2000.0,"Intervalle (h)":250.0,"Heure / Jour Opération":16.0,"Prochain entretien (h)":6350,"Date Planifié Prévu":"2026-11-26"},{"ID Fleet":658.0,"Type équipement":"Engin minier","Catégorie / Modèle":"EXC_ CAT","Site / Département":"KAMOA/CMCK","Statut équipement":"Disponible","Date Dernier entretien":"2026-05-28","Dernier entretien (h)":234.0,"Type dernier entretien H":250.0,"Intervalle (h)":250.0,"Heure / Jour Opération":8.0,"Prochain entretien (h)":484,"Date Planifié Prévu":"2026-06-28"}],"pm":[{"ID intervention":"PM-001","ID Fleet":"74-11","Équipement":"ADT-BELL B45E","Type entretien":"Entretien 1000H","Intervalle (h)":500.0,"Index dernier entretien":20450.0,"Index cible entretien":20950,"Index actuel":20850.0,"Heures restantes":100,"Date planifiée":"2026-11-10","Heure / Jour":"mardi","Département":"MTN ENG","Durée estimée (h)":2.0,"Pièces disponibles ?":"Oui","Statut intervention":"Terminé","Priorité":"Haute","Date début":"2026-11-15","Date fin":"2026-11-15","Alerte":"TERMINÉ","Validation superviseur":"Validé"},{"ID intervention":"PM-002","ID Fleet":656.0,"Équipement":"EXC_ VOLVO EC 480D","Type entretien":"Entretien 1000H","Intervalle (h)":250.0,"Index dernier entretien":8798.0,"Index cible entretien":9048,"Index actuel":9050.0,"Heures restantes":-2,"Date planifiée":"2026-11-07","Département":"MTN ENG","Durée estimée (h)":4.0,"Pièces disponibles ?":"Oui","Statut intervention":"Terminé","Priorité":"Haute","Date début":"2026-11-11","Date fin":"2026-11-11","Index réalisé":9050.0,"Écart vs cible (h)":2,"Prochaine échéance (h)":9300,"Alerte":"TERMINÉ","Validation superviseur":"Validé"},{"ID intervention":"PM-003","ID Fleet":668.0,"Équipement":"DZ-KOMATSU D155","Type entretien":"Entretien 1750","Intervalle (h)":250.0,"Index dernier entretien":17696.0,"Index cible entretien":17946,"Index actuel":18057.0,"Heures restantes":-111,"Département":"MTN ENG","Statut intervention":"Terminé","Priorité":"Moyenne","Alerte":"TERMINÉ","Validation superviseur":"Validé"},{"ID intervention":"PM-004","ID Fleet":627.0,"Équipement":"LOADER VOLVO-L180H","Type entretien":"Entretien 2000H","Intervalle (h)":250.0,"Index dernier entretien":17969.0,"Index cible entretien":18219,"Index actuel":18100.0,"Heures restantes":119,"Date planifiée":"2026-12-25","Département":"MTN ENG","Durée estimée (h)":2.0,"Pièces disponibles ?":"Oui","Statut intervention":"Terminé","Priorité":"Moyenne","Alerte":"TERMINÉ","Validation superviseur":"Validé"},{"ID intervention":"PM-005","ID Fleet":656.0,"Équipement":"EXC_ VOLVO EC 480D","Type entretien":"ENTRETIEN 1250","Intervalle (h)":250.0,"Index dernier entretien":9050.0,"Index cible entretien":9300,"Index actuel":9250.0,"Heures restantes":50,"Département":"MTN ENG","Durée estimée (h)":2.0,"Pièces disponibles ?":"Oui","Statut intervention":"Reporté","Priorité":"Haute","Alerte":"À PLANIFIER","Validation superviseur":"Validé"}],"correctif":[{"ID intervention":"PC-001","Source":"Inspection","ID Fleet":676.0,"Équipement":"GRADER-JHONDEERE 770G/772G","Travaux à réaliser":"REMPLACEMENT REAR AXLE","Priorité":"Urgente","Date planifiée":"2026-11-12","Date début réelle":"2026-11-16","Équipe / techniciens":"Abel, Erick","Responsable":"FREDERICK","Arrêt requis ?":"Oui","Pièces disponibles":"Disponible","Statut intervention":"En cours","Validation production":"Validé"},{"ID intervention":"PC-002","Source":"Backlog","ID Fleet":749.0,"Équipement":"ADT-BELL B45E","Travaux à réaliser":"RECONSTITUER FINAL DRIVE + MONTAGE","Priorité":"Basse","Date planifiée":"2026-11-24","Date début réelle":"2026-12-02","Équipe / techniciens":"Michel, Josue","Responsable":"FREDERICK","Arrêt requis ?":"Non","Pièces disponibles":"Disponible","Statut intervention":"Planifié","Validation production":"Validé"}],"backlog":[{"ID activité":"BL-001","Date création":"2026-11-16","ID Fleet":749.0,"Équipement / modèle":"ADT-BELL","Type activité":"Correctif","Description détaillée":"Reconstitué fina drive + Montage","Origine":"Division Maintenance","Priorité":"Basse","Criticité / risque":"Faible","Disponibilité pièces":"Disponible","Statut backlog":"Planifié","Âge backlog (jours)":10}],"historique":[{"Date réalisation":"2026-11-16","ID Fleet":"74-15","Équipement":"ADT VOLVO","Travaux réalisés":"SOUDURE TUYAU D4ECHAPPEMENT","Pièces consommées":"ELECTRODE","Techniciens":"PAPY","Durée réelle (h)":2.0,"Anomalies constatées":"TUYAU CASSEE","Recommandations":"V2RIFICATION CAUSE EXACT","Validé par":"BLESSMORE"}],"anomalies":[{"ID anomalie":"ANO-0001","Date / heure signalement":"2026-10-30","ID Fleet":674.0,"Équipement":"GRADER-KOMATSU G655-5","Signalé par":"OPERATEUR","Poste":"Jour","Description anomalie":"Manque de Puissance","Système concerné":"Moteur","Sévérité":"Majeure","Risque sécurité":"Élevé","Équipement utilisable ?":"Limité","Mesure temporaire":"Remplacement Préfiltre Gasoil","Action recommandée":"Diagnostic Circuit Alimentation Air + Carburant","Priorité":"Haute","Responsable triage":"Rodriguez","Décision":"À évaluer","Pièces requises":"Filtration","Disponibilité pièces":"Disponible","Durée estimée (h)":2.0,"Date cible":"2026-11-17","Statut anomalie":"Résolue","Âge (jours)":27},{"ID anomalie":"ANO-0002","Date / heure signalement":"2026-10-30","ID Fleet":669.0,"Équipement":"DZ-DRESTA TD-25M","Signalé par":"OPERATEUR","Poste":"Jour","Description anomalie":"Frein de service_Chassis fissuré(Cabine)","Système concerné":"Freinage","Sévérité":"Critique","Risque sécurité":"Élevé","Équipement utilisable ?":"Limité","Mesure temporaire":"Equipement en Observation","Action recommandée":"Vérification Tringlérie et Disque de frein","Priorité":"Haute","Responsable triage":"Frederick","Décision":"En observation","Disponibilité pièces":"Non requis","Durée estimée (h)":2.0,"Date cible":"2026-11-10","Statut anomalie":"Résolue","Âge (jours)":27},{"ID anomalie":"ANO-0003","Date / heure signalement":"2026-11-13","ID Fleet":668.0,"Équipement":"DZ-KOMATSU D155","Signalé par":"Odon","Poste":"Jour","Description anomalie":"Répassage vérin Lame","Système concerné":"Hydraulique","Sévérité":"Modérée","Risque sécurité":"Moyen","Équipement utilisable ?":"Oui","Mesure temporaire":"En Observation","Action recommandée":"Diagnostic circuit hydraulique","Priorité":"Haute","Responsable triage":"Frederick","Décision":"À évaluer","Disponibilité pièces":"Non requis","Durée estimée (h)":1.0,"Statut anomalie":"Nouvelle","Âge (jours)":13},{"ID anomalie":"ANO-0004","Date / heure signalement":"2026-11-13","ID Fleet":665.0,"Équipement":"DZ-KOMATSU D155","Signalé par":"Frederick","Poste":"Jour","Description anomalie":"Bout Gauge Transmission cassé","Système concerné":"Transmission","Sévérité":"Mineure","Risque sécurité":"Faible","Équipement utilisable ?":"Oui","Mesure temporaire":"Rien signalé","Action recommandée":"Remplacement gauge","Priorité":"Basse","Responsable triage":"Frederick","Décision":"En observation","Disponibilité pièces":"Manquant","Durée estimée (h)":0.3,"Statut anomalie":"Nouvelle","Âge (jours)":13},{"ID anomalie":"ANO-0005","Date / heure signalement":"2026-09-16","ID Fleet":"74-10","Équipement":"ADT-BELL B45E","Signalé par":"OPERATEUR","Poste":"Jour","Description anomalie":"Fuite huile hydraulic flexible Pont Arrière","Système concerné":"Hydraulique","Sévérité":"Mineure","Risque sécurité":"Faible","Équipement utilisable ?":"Oui","Mesure temporaire":"Surveillance etat fuite","Action recommandée":"Remplacement flexible si neccessaire","Priorité":"Moyenne","Responsable triage":"Frederick","Décision":"À évaluer","Disponibilité pièces":"Disponible","Durée estimée (h)":1.0,"Statut anomalie":"Nouvelle","Âge (jours)":71},{"ID anomalie":"ANO-0006","Date / heure signalement":"2026-11-16","ID Fleet":"74-11","Équipement":"ADT-BELL B45E","Signalé par":"OPERATEUR","Description anomalie":"Défaut passassion vitesse( Vitessse qui saute)","Système concerné":"Transmission","Sévérité":"Critique","Risque sécurité":"Élevé","Équipement utilisable ?":"Limité","Mesure temporaire":"Vérification du defaut","Action recommandée":"Réparer si détecté","Priorité":"Haute","Décision":"Acceptée","Âge (jours)":10},{"ID anomalie":"ANO-0007","ID Fleet":674.0,"Équipement":"GRADER-KOMATSU G655-5","Signalé par":"OPERATEUR","Poste":"Jour","Description anomalie":"Fuite d'huile moteur","Système concerné":"Moteur","Sévérité":"Majeure","Risque sécurité":"Élevé","Équipement utilisable ?":"Limité","Mesure temporaire":"Vérification de la fuite","Action recommandée":"reparer si détecté","Priorité":"Haute","Décision":"Acceptée"}],"pieces":[{"Désignation":"gasket","Équipement / ID Fleet":748.0,"Qté requise":6.0,"Qté stock":5.0,"Qté manquante":1,"Demande achat":"À commander"}],"dispo":[{"ID Fleet":653.0,"Statut actuel":"En maintenance","Date arrêt":"2026-11-14","Cause arrêt":"DOMMAGE INCENDIE","Intervention nécessaire":"REMPLACEMENT HOSE_ENGINE HARNESS_ENGINE FAN_FUEL FILTER HOUSSING_FUEL PUMP_BATTERIE_ECU","Pièces manquantes":"SENSOR","Responsable":"FREDEERICK","Date prévue remise en service":"2026-11-23","Date remise en service":"2026-11-26","Durée arrêt (jours)":12}]};
+
+/* =====================================================================
+   NORMALISATION — transforme les lignes brutes en objets métier
+   ===================================================================== */
+function normalize(raw){
+  const parc = (raw.parc||[]).map(r=>{
+    const idx=num(pick(r,'Index actuel (h)','Index actuel'));
+    const cible=num(pick(r,'Prochain entretien (h)','Prochain entretien'));
+    let rest=num(pick(r,'Heures restantes'));
+    if(rest==null && idx!=null && cible!=null) rest=cible-idx;
+    return {
+      id: String(pick(r,'ID Fleet')??'').replace(/\.0$/,''),
+      type: pick(r,'Type équipement')||'',
+      modele: pick(r,'Catégorie / Modèle','Catégorie','Modèle')||'',
+      marque: pick(r,'Marque')||'',
+      site: pick(r,'Site / Département','Site')||'—',
+      index: idx, dateIndex: parseDate(pick(r,'Date index')),
+      statut: pick(r,'Statut équipement')||'—',
+      dernierDate: parseDate(pick(r,'Date Dernier entretien')),
+      dernierH: num(pick(r,'Dernier entretien (h)')),
+      typeDernier: pick(r,'Type dernier entretien H'),
+      intervalle: num(pick(r,'Intervalle (h)')),
+      hParJour: num(pick(r,'Heure / Jour Opération'))||0,
+      cible: cible,
+      datePrevue: parseDate(pick(r,'Date Planifié Prévu','Date Planifié')),
+      restant: rest,
+      alerte: pick(r,'Alerte maintenance')||'',
+      resp: pick(r,'Responsable / opérateur','Responsable')||'—',
+      notes: pick(r,'Notes')||''
+    };
+  }).filter(e=>e.id);
+
+  const pm = (raw.pm||[]).map(r=>({
+    id: pick(r,'ID intervention')||'',
+    fleet: String(pick(r,'ID Fleet')??'').replace(/\.0$/,''),
+    equip: pick(r,'Équipement')||'',
+    typeEnt: pick(r,'Type entretien')||'',
+    intervalle: num(pick(r,'Intervalle (h)')),
+    idxDernier: num(pick(r,'Index dernier entretien')),
+    idxCible: num(pick(r,'Index cible entretien')),
+    idxActuel: num(pick(r,'Index actuel')),
+    restant: num(pick(r,'Heures restantes')),
+    date: parseDate(pick(r,'Date planifiée')),
+    dep: pick(r,'Département')||'—',
+    equipe: pick(r,'Techniciens / équipe','Techniciens')||'—',
+    duree: num(pick(r,'Durée estimée (h)')),
+    pieces: pick(r,'Pièces disponibles ?','Pièces disponibles')||'',
+    statut: pick(r,'Statut intervention')||'',
+    prio: pick(r,'Priorité')||'',
+    debut: parseDate(pick(r,'Date début')), fin: parseDate(pick(r,'Date fin')),
+    ecart: num(pick(r,'Écart vs cible (h)')),
+    proch: num(pick(r,'Prochaine échéance (h)')),
+    alerte: pick(r,'Alerte')||'',
+    valid: pick(r,'Validation superviseur')||'',
+    obs: pick(r,'Observations')||''
+  })).filter(x=>x.id||x.fleet);
+
+  const correctif = (raw.correctif||[]).map(r=>({
+    id: pick(r,'ID intervention')||'',
+    source: pick(r,'Source')||'—',
+    srcId: pick(r,'ID anomalie / backlog')||'',
+    fleet: String(pick(r,'ID Fleet')??'').replace(/\.0$/,''),
+    equip: pick(r,'Équipement')||'',
+    travaux: pick(r,'Travaux à réaliser','Travaux')||'',
+    prio: pick(r,'Priorité')||'',
+    date: parseDate(pick(r,'Date planifiée')),
+    debut: parseDate(pick(r,'Date début réelle')),
+    fin: parseDate(pick(r,'Date fin réelle')),
+    hDebut: pick(r,'Heure début')||'', hFin: pick(r,'Heure fin')||'',
+    duree: num(pick(r,'Durée prévue (J)')),
+    equipe: pick(r,'Équipe / techniciens','Équipe')||'—',
+    resp: pick(r,'Responsable')||'—',
+    arret: pick(r,'Arrêt requis ?','Arrêt requis')||'',
+    pieces: pick(r,'Pièces disponibles')||'',
+    statut: pick(r,'Statut intervention')||'',
+    valid: pick(r,'Validation production')||'',
+    com: pick(r,'Commentaire / blocage','Commentaire')||''
+  })).filter(x=>x.id||x.fleet);
+
+  const backlog = (raw.backlog||[]).map(r=>{
+    const cre=parseDate(pick(r,'Date création'));
+    let age=num(pick(r,'Âge backlog (jours)','Age backlog'));
+    if(age==null && cre) age=daysBetween(cre,TODAY);
+    return {
+      id: pick(r,'ID activité')||'', cree: cre,
+      fleet: String(pick(r,'ID Fleet')??'').replace(/\.0$/,''),
+      equip: pick(r,'Équipement / modèle','Équipement')||'',
+      type: pick(r,'Type activité')||'', desc: pick(r,'Description détaillée','Description')||'',
+      origine: pick(r,'Origine')||'—', prio: pick(r,'Priorité')||'',
+      crit: pick(r,'Criticité / risque','Criticité')||'', resp: pick(r,'Responsable')||'—',
+      equipe: pick(r,'Équipe / techniciens')||'—', duree: num(pick(r,'Durée estimée (h)')),
+      piecesReq: pick(r,'Pièces requises')||'', dispoP: pick(r,'Disponibilité pièces')||'',
+      statut: pick(r,'Statut backlog')||'', dateSouh: parseDate(pick(r,'Date souhaitée')),
+      date: parseDate(pick(r,'Date planifiée')), lien: pick(r,'ID planning lié')||'',
+      age: age, com: pick(r,'Commentaire')||''
+    };
+  }).filter(x=>x.id||x.fleet);
+
+  const anomalies = (raw.anomalies||[]).map(r=>{
+    const sig=parseDate(pick(r,'Date / heure signalement','Date signalement'));
+    let age=num(pick(r,'Âge (jours)','Age'));
+    if(age==null && sig) age=daysBetween(sig,TODAY);
+    return {
+      id: pick(r,'ID anomalie')||'', date: sig,
+      fleet: String(pick(r,'ID Fleet')??'').replace(/\.0$/,''),
+      equip: pick(r,'Équipement')||'', par: pick(r,'Signalé par')||'—', poste: pick(r,'Poste')||'',
+      desc: pick(r,'Description anomalie','Description')||'',
+      systeme: pick(r,'Système concerné','Système')||'Non précisé',
+      sev: pick(r,'Sévérité')||'', risque: pick(r,'Risque sécurité')||'',
+      utilisable: pick(r,'Équipement utilisable ?','Équipement utilisable')||'',
+      mesure: pick(r,'Mesure temporaire')||'', action: pick(r,'Action recommandée')||'',
+      prio: pick(r,'Priorité')||'', triage: pick(r,'Responsable triage')||'—',
+      decision: pick(r,'Décision')||'', piecesReq: pick(r,'Pièces requises')||'',
+      dispoP: pick(r,'Disponibilité pièces')||'', duree: num(pick(r,'Durée estimée (h)')),
+      cible: parseDate(pick(r,'Date cible')), prog: parseDate(pick(r,'Date programmée')),
+      idBacklog: pick(r,'ID backlog')||'', idPlan: pick(r,'ID planning correctif')||'',
+      statut: pick(r,'Statut anomalie')||'', age: age, com: pick(r,'Commentaires')||''
+    };
+  }).filter(x=>x.id);
+
+  const pieces = (raw.pieces||[]).map(r=>({
+    id: pick(r,'ID pièce')||'', ref: pick(r,'Référence')||'—',
+    desig: pick(r,'Désignation')||'', fleet: String(pick(r,'Équipement / ID Fleet')??'').replace(/\.0$/,''),
+    qReq: num(pick(r,'Qté requise')), qStock: num(pick(r,'Qté stock')), qManq: num(pick(r,'Qté manquante')),
+    demande: pick(r,'Demande achat')||'', pr: pick(r,'PR Attaché')||'',
+    dDemande: parseDate(pick(r,'Date demande')), dPrevue: parseDate(pick(r,'Date réception prévue')),
+    dReelle: parseDate(pick(r,'Date réception réelle')),
+    statut: pick(r,'Statut')||'', fourn: pick(r,'Fournisseur')||'—', com: pick(r,'Commentaire')||''
+  })).filter(x=>x.desig||x.ref!=='—'||x.fleet);
+
+  const dispo = (raw.dispo||[]).map(r=>({
+    fleet: String(pick(r,'ID Fleet')??'').replace(/\.0$/,''),
+    equip: pick(r,'Équipement')||'', statut: pick(r,'Statut actuel')||'',
+    dArret: parseDate(pick(r,'Date arrêt')), idxArret: num(pick(r,'Index arrêt')),
+    cause: pick(r,'Cause arrêt')||'', interv: pick(r,'Intervention nécessaire')||'',
+    piecesManq: pick(r,'Pièces manquantes')||'', resp: pick(r,'Responsable')||'—',
+    dPrevue: parseDate(pick(r,'Date prévue remise en service')),
+    dRemise: parseDate(pick(r,'Date remise en service')),
+    duree: num(pick(r,'Durée arrêt (jours)')), com: pick(r,'Commentaires')||''
+  })).filter(x=>x.fleet);
+
+  const historique = (raw.historique||[]).map(r=>({
+    id: pick(r,'ID intervention')||'', date: parseDate(pick(r,'Date réalisation')),
+    fleet: String(pick(r,'ID Fleet')??'').replace(/\.0$/,''),
+    equip: pick(r,'Équipement')||'', typeEnt: pick(r,'Type entretien')||'',
+    idxAvant: num(pick(r,'Index avant')), travaux: pick(r,'Travaux réalisés')||'',
+    piecesCons: pick(r,'Pièces consommées')||'', tech: pick(r,'Techniciens')||'—',
+    duree: num(pick(r,'Durée réelle (h)')), anomalies: pick(r,'Anomalies constatées')||'',
+    reco: pick(r,'Recommandations')||'', valide: pick(r,'Validé par')||'—'
+  })).filter(x=>x.fleet||x.date);
+
+  return {parc,pm,correctif,backlog,anomalies,pieces,dispo,historique};
+}
+
+/* =====================================================================
+   CLASSIFICATION DES TÂCHES (unifie toutes les sources en événements)
+   ===================================================================== */
+const TYPES = {
+  prev:{k:'prev',lbl:'Préventif',cls:'prev',color:'var(--t-prev)',ic:'wrench'},
+  corr:{k:'corr',lbl:'Correctif',cls:'corr',color:'var(--t-corr)',ic:'alert'},
+  insp:{k:'insp',lbl:'Inspection',cls:'insp',color:'var(--t-insp)',ic:'eye'},
+  camp:{k:'camp',lbl:'Campagne spéciale',cls:'camp',color:'var(--t-camp)',ic:'spark'}
+};
+function typeOf(s){
+  const n=norm(s);
+  if(!n) return 'corr';
+  if(/inspect|controle|verif|visite/.test(n)) return 'insp';
+  if(/campagne|special|projet|revision gen|chantier/.test(n)) return 'camp';
+  if(/prevent|entretien|pm|service/.test(n)) return 'prev';
+  return 'corr';
+}
+const CLOS = /termin|cloture|resolu|realis|execute|fait/;
+const isClosed = s => CLOS.test(norm(s));
+
+/* construit la liste unifiée des événements planifiés */
+function buildEvents(D){
+  const ev=[];
+  D.pm.forEach(p=>{ if(p.date) ev.push({date:p.date,type:'prev',titre:(p.typeEnt||'Entretien préventif'),equip:p.equip||p.fleet,fleet:p.fleet,
+    resp:p.equipe,statut:p.statut||'Planifié',prio:p.prio,site:'',dep:p.dep,src:'Plan préventif',id:p.id,duree:p.duree}); });
+  D.parc.forEach(e=>{ if(e.datePrevue && !D.pm.some(p=>p.fleet===e.id && p.date && ymd(p.date)===ymd(e.datePrevue)))
+    ev.push({date:e.datePrevue,type:'prev',titre:'Entretien '+(e.intervalle?e.intervalle+'h':'préventif'),equip:e.modele||e.id,fleet:e.id,
+      resp:e.resp,statut:(e.restant!=null&&e.restant<0)?'En retard':'Planifié',prio:'',site:e.site,dep:'',src:'Parc équipements',id:e.id,duree:null}); });
+  D.correctif.forEach(c=>{ const d=c.date||c.debut; if(d) ev.push({date:d,type:typeOf(c.source==='Inspection'?'inspection':'correctif'),titre:c.travaux||'Travaux correctifs',
+    equip:c.equip||c.fleet,fleet:c.fleet,resp:c.equipe,statut:c.statut||'Planifié',prio:c.prio,site:'',dep:'',src:'Planning correctif',id:c.id,duree:c.duree}); });
+  D.backlog.forEach(b=>{ const d=b.date||b.dateSouh; if(d) ev.push({date:d,type:typeOf(b.type),titre:b.desc||b.type||'Activité backlog',
+    equip:b.equip||b.fleet,fleet:b.fleet,resp:b.equipe,statut:b.statut||'En attente',prio:b.prio,site:'',dep:'',src:'Backlog',id:b.id,duree:b.duree}); });
+  D.anomalies.forEach(a=>{ const d=a.prog||a.cible; if(d) ev.push({date:d,type:'insp',titre:a.action||a.desc||'Traitement anomalie',
+    equip:a.equip||a.fleet,fleet:a.fleet,resp:a.triage,statut:a.statut||'Nouvelle',prio:a.prio,site:'',dep:'',src:'Anomalies',id:a.id,duree:a.duree}); });
+  ev.forEach(e=>{ const p=D.parc.find(x=>x.id===e.fleet); if(p){ e.site=e.site||p.site; e.modele=p.modele; } });
+  return ev.sort((a,b)=>a.date-b.date);
+}
+
+/* =====================================================================
+   FILTRES
+   ===================================================================== */
+const F = {site:'',dep:'',flotte:'',equip:'',resp:'',type:'',periode:''};
+const FDEF = [
+  ['s-site','site','Tous les sites'],['s-dep','dep','Tous les ateliers'],
+  ['s-flotte','flotte','Toutes les flottes'],['s-equip','equip','Tous les engins'],
+  ['s-resp','resp','Tous les responsables'],['s-type','type','Toutes catégories'],
+  ['s-periode','periode','Toute la période']
+];
+const PERIODES = [['w','Cette semaine'],['m','Ce mois'],['q','Ce trimestre'],['y','Cette année'],['l30','30 derniers jours'],['n30','30 prochains jours']];
+
+function periodRange(k){
+  const d=new Date(TODAY);
+  if(k==='w'){ const s=startOfWeek(d), e=new Date(s); e.setDate(e.getDate()+6); return [s,e]; }
+  if(k==='m') return [new Date(d.getFullYear(),d.getMonth(),1), new Date(d.getFullYear(),d.getMonth()+1,0)];
+  if(k==='q'){ const q=Math.floor(d.getMonth()/3); return [new Date(d.getFullYear(),q*3,1), new Date(d.getFullYear(),q*3+3,0)]; }
+  if(k==='y') return [new Date(d.getFullYear(),0,1), new Date(d.getFullYear(),11,31)];
+  if(k==='l30'){ const s=new Date(d); s.setDate(s.getDate()-30); return [s,d]; }
+  if(k==='n30'){ const e=new Date(d); e.setDate(e.getDate()+30); return [d,e]; }
+  return null;
+}
+function inPeriod(date){
+  if(!F.periode||!date) return !F.periode;
+  const r=periodRange(F.periode); if(!r) return true;
+  return date>=r[0] && date<=r[1];
+}
+function buildFilters(D){
+  const u=(arr,f)=>[...new Set(arr.map(f).filter(v=>v&&v!=='—'))].sort((a,b)=>String(a).localeCompare(String(b),'fr'));
+  const opts={
+    site:u(D.parc,e=>e.site),
+    dep:u([...D.pm,...D.parc],e=>e.dep||''),
+    flotte:u(D.parc,e=>e.modele),
+    equip:u(D.parc,e=>e.id),
+    resp:u([...D.parc.map(e=>e.resp),...D.correctif.map(c=>c.resp),...D.backlog.map(b=>b.resp)],v=>v),
+    type:Object.values(TYPES).map(t=>t.lbl),
+    periode:PERIODES.map(p=>p[1])
+  };
+  FDEF.forEach(([id,key,all])=>{
+    const sel=$('#'+id); const cur=F[key];
+    let html=`<option value="">${all}</option>`;
+    if(key==='periode') html+=PERIODES.map(p=>`<option value="${p[0]}">${p[1]}</option>`).join('');
+    else html+=opts[key].map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    sel.innerHTML=html; sel.value=cur; sel.classList.toggle('set',!!cur);
+  });
+  const n=Object.values(F).filter(Boolean).length;
+  $('#s-clear').hidden = n===0;
+  $('#s-count').textContent = n? `${n} filtre${n>1?'s':''} actif${n>1?'s':''}` : '';
+}
+function matchEquip(e){           // e = objet parc
+  if(!e) return !F.site && !F.flotte && !F.equip;
+  if(F.site && e.site!==F.site) return false;
+  if(F.flotte && e.modele!==F.flotte) return false;
+  if(F.equip && e.id!==F.equip) return false;
+  return true;
+}
+function applyFilters(D){
+  const byId=new Map(D.parc.map(e=>[e.id,e]));
+  const keepFleet = fleet => {
+    if(!F.site && !F.flotte && !F.equip) return true;
+    return matchEquip(byId.get(fleet));
+  };
+  const keepResp = v => !F.resp || v===F.resp;
+  const out={
+    parc: D.parc.filter(e=>matchEquip(e)&&keepResp(e.resp)),
+    pm: D.pm.filter(p=>keepFleet(p.fleet)&&(!F.dep||p.dep===F.dep)&&(!F.periode||inPeriod(p.date))),
+    correctif: D.correctif.filter(c=>keepFleet(c.fleet)&&keepResp(c.resp)&&(!F.periode||inPeriod(c.date||c.debut))),
+    backlog: D.backlog.filter(b=>keepFleet(b.fleet)&&keepResp(b.resp)&&(!F.periode||inPeriod(b.cree))),
+    anomalies: D.anomalies.filter(a=>keepFleet(a.fleet)&&(!F.periode||inPeriod(a.date))),
+    pieces: D.pieces.filter(p=>keepFleet(p.fleet)),
+    dispo: D.dispo.filter(d=>keepFleet(d.fleet)),
+    historique: D.historique.filter(h=>keepFleet(h.fleet)&&(!F.periode||inPeriod(h.date)))
+  };
+  out.events = buildEvents(out).filter(e=>!F.type || TYPES[e.type].lbl===F.type);
+  return out;
+}
+
+/* =====================================================================
+   MOTEUR KPI
+   ===================================================================== */
+function computeKPI(D){
+  const S=CONFIG.seuilAlerteH;
+  const parc=D.parc;
+  const total=parc.length;
+  const dispo=parc.filter(e=>/disponible/.test(norm(e.statut))).length;
+  const immo=parc.filter(e=>/immobilis/.test(norm(e.statut))).length;
+  const attP=parc.filter(e=>/attente piece/.test(norm(e.statut))).length;
+  const tauxDispo = total? dispo/total*100 : 0;
+
+  // suivi horaire : équipements avec échéance calculable
+  const suivis=parc.filter(e=>e.restant!=null);
+  const pmRetardParc=suivis.filter(e=>e.restant<0);
+  const pmProcheParc=suivis.filter(e=>e.restant>=0&&e.restant<=S);
+  const pmOkParc=suivis.filter(e=>e.restant>S);
+
+  // plan préventif
+  const pmAll=D.pm;
+  const pmPlan=pmAll.filter(p=>!isClosed(p.statut)&&(/planifi|en cours/.test(norm(p.statut))||p.date));
+  const pmCours=pmAll.filter(p=>/en cours/.test(norm(p.statut)));
+  const pmFait=pmAll.filter(p=>isClosed(p.statut));
+  const pmRep=pmAll.filter(p=>/report/.test(norm(p.statut)));
+  const pmRetardPlan=pmAll.filter(p=>!isClosed(p.statut)&&((p.restant!=null&&p.restant<0)||/depass|retard/.test(norm(p.alerte))||(p.date&&p.date<TODAY)));
+  const pmDuAuj=pmAll.filter(p=>p.date&&ymd(p.date)===ymd(TODAY)&&!isClosed(p.statut));
+  const pmMois=pmFait.filter(p=>{const d=p.fin||p.debut; return d&&d.getMonth()===TODAY.getMonth()&&d.getFullYear()===TODAY.getFullYear();});
+  const pmATemps=pmFait.filter(p=>p.ecart==null||p.ecart<=0||(p.restant!=null&&p.restant>=0));
+  const respect = pmFait.length? pmATemps.length/pmFait.length*100 : null;
+
+  // correctifs
+  const co=D.correctif;
+  const coOuv=co.filter(c=>!isClosed(c.statut));
+  const coPlan=co.filter(c=>/planifi/.test(norm(c.statut)));
+  const coCours=co.filter(c=>/en cours/.test(norm(c.statut)));
+  const coRep=co.filter(c=>/report/.test(norm(c.statut)));
+  const coClos=co.filter(c=>isClosed(c.statut));
+  const coSansPlan=co.filter(c=>!c.date&&!isClosed(c.statut));
+
+  // anomalies
+  const an=D.anomalies;
+  const anOuv=an.filter(a=>!isClosed(a.statut));
+  const anNouv=an.filter(a=>/nouvelle|triage|evaluer/.test(norm(a.statut)+' '+norm(a.decision)));
+  const anCrit=an.filter(a=>/critique/.test(norm(a.sev))&&!isClosed(a.statut));
+  const anBloq=an.filter(a=>!isClosed(a.statut)&&(/non|^$/.test(norm(a.utilisable))||/arret/.test(norm(a.sev))));
+  const anSurv=an.filter(a=>/observation|surveill/.test(norm(a.decision)+' '+norm(a.statut)));
+
+  // backlog
+  const bk=D.backlog.filter(b=>!isClosed(b.statut));
+  const bk30=bk.filter(b=>(b.age??0)>30);
+  const bk60=bk.filter(b=>(b.age??0)>60);
+  const MANQ=/manqu|attente|commander|rupture|indispo/;
+  const bkSansP=bk.filter(b=>MANQ.test(norm(b.dispoP)));
+
+  // pièces
+  const pcACom=D.pieces.filter(p=>(p.qManq??0)>0||/commander|attente|rupture/.test(norm(p.statut)+' '+norm(p.demande)));
+
+  // immobilisations > seuil
+  const immoLong=D.dispo.filter(d=>{
+    if(d.dRemise) return false;
+    const h=(d.duree!=null)? d.duree*24 : (d.dArret? daysBetween(d.dArret,TODAY)*24 : 0);
+    return h>CONFIG.seuilImmobH;
+  });
+
+  // OT bloqués faute de pièces, toutes origines confondues
+  const pcAtt=[
+    ...bkSansP.map(b=>({o:'Backlog',id:b.id})),
+    ...co.filter(c=>!isClosed(c.statut)&&/manqu|attente|commander/.test(norm(c.pieces))).map(c=>({o:'Correctif',id:c.id})),
+    ...an.filter(a=>!isClosed(a.statut)&&/manqu|commander/.test(norm(a.dispoP))).map(a=>({o:'Anomalie',id:a.id})),
+    ...D.dispo.filter(d=>d.piecesManq&&!d.dRemise).map(d=>({o:'Immobilisation',id:d.fleet}))
+  ];
+  return {pcACom,total,dispo,immo,attP,tauxDispo,suivis,pmRetardParc,pmProcheParc,pmOkParc,
+    pmAll,pmPlan,pmCours,pmFait,pmRep,pmRetardPlan,pmDuAuj,pmMois,respect,
+    co,coOuv,coPlan,coCours,coRep,coClos,coSansPlan,
+    an,anOuv,anNouv,anCrit,anBloq,anSurv,bk,bk30,bk60,bkSansP,pcAtt,immoLong,
+    pmRetard: pmRetardParc.length+pmRetardPlan.length,
+    pmProche: pmProcheParc.length};
+}
+
+
+/* =====================================================================
+   COMPOSANTS DE RENDU
+   ===================================================================== */
+function stat(o){
+  const tone=o.tone||'ml', tag=o.go?'button':'div';
+  return `<${tag} class="stat ${tone}"${o.go?` data-go="${esc(o.go)}"`:''}>
+    ${o.go?`<span class="go">${ic('chev-r-sm')}</span>`:''}
+    <div class="stat-k">${ic(o.ic||'info')}${esc(o.k)}</div>
+    <div class="stat-v">${o.v}${o.unit?`<span class="unit">${o.unit}</span>`:''}</div>
+    ${o.d?`<div class="stat-d">${esc(o.d)}</div>`:''}
+  </${tag}>`;
+}
+function stripCell(o){
+  const tag=o.go?'button':'div';
+  return `<${tag} class="strip-cell"${o.go?` data-go="${esc(o.go)}"`:''}>
+    <div class="strip-k"><span class="pip ${o.tone||''}"></span>${esc(o.k)}</div>
+    <div class="strip-v">${o.v}</div>
+    <div class="strip-d">${esc(o.d||'')}</div></${tag}>`;
+}
+function plot(l,v,max,color,extra,go){
+  const pct=max>0?Math.max(v>0?2:0,v/max*100):0, tag=go?'button':'div';
+  return `<${tag} class="plot"${go?` data-go="${esc(go)}"`:''}>
+    <div class="plot-k">${esc(l)}</div>
+    <div class="plot-t"><div class="plot-f" style="width:${pct}%;background:${color}"></div></div>
+    <div class="plot-v">${nf(v)}${extra?`<small>${esc(extra)}</small>`:''}</div></${tag}>`;
+}
+function plots(items,color){
+  if(!items.length) return voidBox('Aucune donnée');
+  const max=Math.max(...items.map(i=>i.v),1);
+  return items.map(i=>plot(i.l,i.v,max,i.c||color||'var(--malachite)',i.x,i.go)).join('');
+}
+function voidBox(t,s){
+  return `<div class="void">${ic('void')}<b>${esc(t)}</b>${s?`<span>${esc(s)}</span>`:''}</div>`;
+}
+function tbl(cols,rows,opts={}){
+  const key=opts.key;
+  if(!rows.length) return `<tbody><tr><td colspan="${cols.length}">${voidBox(opts.empty||'Aucune ligne',opts.emptySub)}</td></tr></tbody>`;
+  if(key&&SORT[key]){
+    const {i,dir}=SORT[key], c=cols[i];
+    if(c&&c.s){ rows=[...rows].sort((a,b)=>{
+      const x=c.s(a),y=c.s(b);
+      if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1;
+      return (typeof x==='string'? x.localeCompare(y,'fr') : x-y)*dir; }); }
+  }
+  const head=`<thead><tr>${cols.map((c,i)=>{
+    const srt=key&&c.s, on=srt&&SORT[key]&&SORT[key].i===i;
+    return `<th class="${c.num?'num ':''}${srt?'sortable ':''}${on?'sorted':''}"${srt?` data-sort="${key}:${i}"`:''}>${esc(c.t)}${srt?`<span class="arr">${on?(SORT[key].dir>0?'↑':'↓'):'↕'}</span>`:''}</th>`;
+  }).join('')}</tr></thead>`;
+  const body=`<tbody>${rows.map(r=>{
+    const f=opts.fleet?opts.fleet(r):null;
+    return `<tr${f?` class="tap" data-fleet="${esc(f)}"`:''}>${cols.map(c=>`<td class="${c.num?'num ':''}${c.hd?'hd':''}">${c.r(r)}</td>`).join('')}</tr>`;
+  }).join('')}</tbody>`;
+  return head+body;
+}
+const SORT={};
+function tag(s){
+  const n=norm(s); if(!n) return `<span class="tag g-mt"><span class="pip"></span>—</span>`;
+  let c='g-mt';
+  if(/disponible|termin|resolu|cloture|ok|valide|conforme|cycle normal/.test(n)) c='g-cl';
+  if(/planifi|nouvelle|en cours|observation|evaluer/.test(n)) c='g-ml';
+  if(/attente|report|surveill|a planifier|proche/.test(n)) c='g-ct';
+  if(/immobilis|depass|retard|critique|bloqu|arret|urgent/.test(n)) c='g-hz';
+  return `<span class="tag ${c}"><span class="pip"></span>${esc(s)}</span>`;
+}
+function sevTag(s){
+  const n=norm(s); let c='g-mt';
+  if(/critique/.test(n))c='g-hz'; else if(/majeure|eleve/.test(n))c='g-ct';
+  else if(/moderee|moyen/.test(n))c='g-ml'; else if(/mineure|faible/.test(n))c='g-cl';
+  return s?`<span class="tag ${c}"><span class="pip"></span>${esc(s)}</span>`:'—';
+}
+function catTag(k){const t=TYPES[k];return `<span class="tag g-${t.cls}">${ic(t.ic)}${t.lbl}</span>`;}
+function fleetBadge(id){return id?`<span class="fleet">${esc(id)}</span>`:'—';}
+function restCell(v){
+  if(v==null) return '<span style="color:var(--graphite-4)">—</span>';
+  const s=v<0?'over':(v<=CONFIG.seuilAlerteH?'warn':'ok');
+  const col=s==='over'?'var(--hazard-ink)':s==='warn'?'var(--caution-ink)':'var(--graphite)';
+  return `<span style="color:${col};font-weight:600">${nf1(v)} h</span>`;
+}
+
+/* ---------- SIGNATURE : réglette de compteur horaire ---------- */
+function meter(e,opts={}){
+  const {index:idx,cible,restant:rest,intervalle:iv}=e;
+  if(rest==null) return `<div class="murmur" style="margin:0">Index horaire non renseigné</div>`;
+  const span = iv || (cible!=null&&idx!=null? Math.max(Math.abs(cible-idx)*2,250) : 250);
+  const base = cible!=null? cible-span : null;
+  let pct = (base!=null&&idx!=null)? (idx-base)/span*100 : (rest<0?110:50);
+  pct=Math.max(2,Math.min(pct,128));
+  const over = rest<0, warn = !over && rest<=CONFIG.seuilAlerteH;
+  const notch = Math.min(100/1.28,100); // repère de cible dans l'échelle 0–128 %
+  const scale = v=>v/1.28;
+  const st = over?'over':warn?'warn':'ok';
+  return `<div class="meter">
+    <div class="meter-track">
+      <div class="meter-fill ${st}" style="width:${scale(Math.min(pct,100))}%"></div>
+      ${over?`<div class="meter-over" style="left:${scale(100)}%;width:${scale(Math.min(pct,128)-100)}%"></div>`:''}
+      <div class="meter-notch" style="left:${scale(100)}%"></div>
+    </div>
+    <div class="meter-read">
+      <span class="idx">${idx!=null?nf(idx):'—'} / ${cible!=null?nf(cible):'—'} h</span>
+      <span class="rest ${st}">${over?'+':''}${nf1(Math.abs(rest))} h<span class="suf">${over?'retard':'restant'}</span></span>
+    </div>
+  </div>`;
+}
+
+/* =====================================================================
+   ACCUEIL
+   ===================================================================== */
+let Q_MODE='urgent';
+function renderExec(D,K){
+  $('#cr-num').innerHTML=`${nf1(K.tauxDispo)}<span class="unit">%</span>`;
+  $('#cr-sub').textContent=`${nf(K.dispo)} engins opérationnels sur ${nf(K.total)} · cible 85 %`;
+  const segs=[['Disponible',K.dispo,'var(--clear)','Disponible'],
+              ['Immobilisé',K.immo,'var(--hazard)','Immobilisé'],
+              ['Attente pièces',K.attP,'var(--caution)','En attente pièces']];
+  const t=Math.max(K.total,1);
+  $('#cr-split').innerHTML=segs.map(s=>`<i style="width:${s[1]/t*100}%;background:${s[2]}"></i>`).join('');
+  $('#cr-keys').innerHTML=segs.map(s=>`<button data-statut="${esc(s[3])}"><span class="sw" style="background:${s[2]}"></span>${s[0]} <b>${nf(s[1])}</b></button>`).join('');
+
+  // ---- file de triage : l'élément focal ----
+  let q=D.parc.filter(e=>e.restant!=null);
+  if(Q_MODE==='urgent') q=q.filter(e=>e.restant<=CONFIG.seuilAlerteH);
+  q.sort((a,b)=>a.restant-b.restant);
+  $('#q-sub').textContent = Q_MODE==='urgent'
+    ? `${q.length} engin${q.length>1?'s':''} sous seuil ou dépassé`
+    : `${q.length} engin${q.length>1?'s':''} avec index horaire`;
+  $('#queue').innerHTML = q.length? q.slice(0,14).map(e=>`
+    <button class="q-item" data-fleet="${esc(e.id)}">
+      ${fleetBadge(e.id)}
+      <div class="q-id">
+        <span class="nm">${esc(e.modele||'Modèle non renseigné')}</span>
+        <span class="sub">${esc(e.site)} · ${tag(e.statut)}</span>
+      </div>
+      <div class="q-m">${meter(e)}</div>
+    </button>`).join('')
+    : `<div class="settled">${ic('check')}<b>Aucun engin sous seuil</b><span>Tous les compteurs suivis sont dans leur cycle.</span></div>`;
+
+  // ---- alertes ----
+  const A=[];
+  if(K.pmRetardParc.length) A.push({tone:'hz',ic:'clock',t:'PM en retard',n:K.pmRetardParc.length,
+    go:'prev:late', b:K.pmRetardParc.slice(0,5).map(e=>`<code>${esc(e.id)}</code> ${nf1(e.restant)} h`).join(' · ')});
+  if(K.pmProcheParc.length) A.push({tone:'ct',ic:'bell',t:`PM sous ${CONFIG.seuilAlerteH} h`,n:K.pmProcheParc.length,
+    go:'prev:soon', b:K.pmProcheParc.slice(0,5).map(e=>`<code>${esc(e.id)}</code> ${nf1(e.restant)} h`).join(' · ')});
+  if(K.immoLong.length) A.push({tone:'hz',ic:'ban',t:`Immobilisé > ${CONFIG.seuilImmobH} h`,n:K.immoLong.length,
+    go:'kpi', b:K.immoLong.slice(0,4).map(d=>`<code>${esc(d.fleet)}</code> ${esc(d.cause||'cause non précisée')}`).join(' · ')});
+  if(K.coSansPlan.length) A.push({tone:'ct',ic:'pin',t:'Correctif sans planification',n:K.coSansPlan.length,
+    go:'corr', b:K.coSansPlan.slice(0,4).map(c=>`<code>${esc(c.id||c.fleet)}</code> ${esc(c.travaux||'—')}`).join(' · ')});
+  if(K.bk30.length) A.push({tone:'ct',ic:'stack',t:`Backlog > ${CONFIG.seuilBacklogJ} jours`,n:K.bk30.length,
+    go:'back', b:K.bk30.slice(0,4).map(b=>`<code>${esc(b.id)}</code> ${b.age} j`).join(' · ')});
+  if(K.anCrit.length) A.push({tone:'hz',ic:'alert',t:'Anomalies critiques non résolues',n:K.anCrit.length,
+    go:'corr', b:K.anCrit.slice(0,4).map(a=>`<code>${esc(a.fleet)}</code> ${esc(a.desc||a.systeme)}`).join(' · ')});
+  const tot=A.reduce((s,a)=>s+a.n,0);
+  const fl=$('#fl-n');
+  fl.textContent=tot?`${tot} à traiter`:'Rien à signaler';
+  fl.className='tag '+(A.some(a=>a.tone==='hz')?'g-hz':A.length?'g-ct':'g-cl');
+  $('#flags').innerHTML = A.length? A.map(a=>{
+    const bg=a.tone==='hz'?'var(--hazard-wash)':'var(--caution-wash)';
+    const fg=a.tone==='hz'?'var(--hazard)':'var(--caution)';
+    const ink=a.tone==='hz'?'var(--hazard-ink)':'var(--caution-ink)';
+    return `<button class="flag" data-go="${esc(a.go)}">
+      <span class="flag-ic" style="background:${bg}">${ic(a.ic).replace('<svg','<svg style="stroke:'+fg+'"')}</span>
+      <span class="flag-b"><span class="hd">${esc(a.t)}</span><span class="bd">${a.b}</span></span>
+      <span class="flag-n" style="color:${ink}">${a.n}</span></button>`;
+  }).join('') : `<div class="settled">${ic('check')}<b>Aucune alerte active</b><span>Tous les seuils du cahier des charges sont respectés.</span></div>`;
+
+  // ---- KPI : palier 1 (4 tuiles) ----
+  const dStat=K.tauxDispo>=85?'cl':K.tauxDispo>=70?'ct':'hz';
+  $('#kpi-lead').innerHTML=[
+    stat({k:'Parc total',ic:'truck',v:nf(K.total),d:'Engins enregistrés',tone:'ml',go:'kpi'}),
+    stat({k:'Disponibilité',ic:'gauge',v:nf1(K.tauxDispo),unit:'%',tone:dStat,
+          d:`${nf(K.dispo)} disponibles · ${nf(K.immo)} immobilisés`,go:'kpi'}),
+    stat({k:'PM en retard',ic:'clock',v:nf(K.pmRetard),tone:K.pmRetard>0?'hz':'cl',
+          d:'Index cible dépassé',go:'prev:late'}),
+    stat({k:'Anomalies critiques',ic:'alert',v:nf(K.anCrit.length),tone:K.anCrit.length>0?'hz':'cl',
+          d:`Non résolues · ${nf(K.an.filter(a=>/critique/.test(norm(a.sev))).length)} au total`,go:'corr'})
+  ].join('');
+
+  // ---- KPI : palier 2 (bande compacte) ----
+  $('#kpi-strip').innerHTML=[
+    stripCell({k:'Disponible',v:nf(K.dispo),d:'Prêts à travailler',tone:'cl'}),
+    stripCell({k:'Immobilisé',v:nf(K.immo),d:'Arrêt technique',tone:K.immo?'hz':''}),
+    stripCell({k:'PM planifiées',v:nf(K.pmPlan.length),d:'Au plan préventif',go:'prev'}),
+    stripCell({k:'PM réalisées',v:nf(K.pmFait.length),d:'Clôturées',tone:'cl',go:'prev'}),
+    stripCell({k:`Sous ${CONFIG.seuilAlerteH} h`,v:nf(K.pmProche),d:'Seuil d\'alerte',tone:K.pmProche?'ct':'',go:'prev:soon'}),
+    stripCell({k:'Correctifs',v:nf(K.coOuv.length),d:'OT ouverts',tone:K.coOuv.length?'ct':'',go:'corr'}),
+    stripCell({k:'Backlog',v:nf(K.bk.length),d:'Travaux en attente',tone:K.bk.length?'ct':'',go:'back'}),
+    stripCell({k:'Pièces',v:nf(K.pcAtt.length),d:'OT bloqués',tone:K.pcAtt.length?'ct':'',go:'mag'})
+  ].join('');
+
+  // ---- parc par site ----
+  const sites={};
+  D.parc.forEach(e=>{const s=e.site||'—';sites[s]=sites[s]||{d:0,i:0,p:0,t:0};sites[s].t++;
+    if(/disponible/.test(norm(e.statut)))sites[s].d++;else if(/immobilis/.test(norm(e.statut)))sites[s].i++;else sites[s].p++;});
+  const sl=Object.entries(sites).sort((a,b)=>b[1].t-a[1].t);
+  $('#by-site').innerHTML = sl.length? sl.map(([s,v])=>{
+    const w=x=>v.t?x/v.t*100:0;
+    return `<button class="plot" data-site="${esc(s)}" style="grid-template-columns:1fr;gap:5px;padding:7px 6px;margin:0 -6px;width:calc(100% + 12px)">
+      <div style="display:flex;justify-content:space-between;font-size:12px;align-items:baseline">
+        <b style="font-weight:600">${esc(s)}</b>
+        <span class="mono" style="color:var(--graphite-3);font-size:11.5px">${nf1(v.t?v.d/v.t*100:0)} % · ${v.t} engins</span></div>
+      <div class="plot-t" style="height:13px;display:flex">
+        <div style="width:${w(v.d)}%;background:var(--clear)"></div>
+        <div style="width:${w(v.i)}%;background:var(--hazard);box-shadow:inset 2px 0 0 var(--paper)"></div>
+        <div style="width:${w(v.p)}%;background:var(--caution);box-shadow:inset 2px 0 0 var(--paper)"></div>
+      </div></button>`;
+  }).join('')+`<div class="keys"><div><span class="sw" style="background:var(--clear)"></span>Disponible</div><div><span class="sw" style="background:var(--hazard)"></span>Immobilisé</div><div><span class="sw" style="background:var(--caution)"></span>Attente pièces</div></div>`
+  : voidBox('Aucun engin');
+
+  const mix={}; D.events.forEach(e=>mix[e.type]=(mix[e.type]||0)+1);
+  $('#by-type').innerHTML=plots(Object.values(TYPES).map(t=>({l:t.lbl,v:mix[t.k]||0,c:t.color,go:'plan:'+t.lbl})));
+}
+
+/* =====================================================================
+   PLANNING — trois vues simultanées
+   ===================================================================== */
+const CAL={year:TODAY.getFullYear(),month:TODAY.getMonth(),week:startOfWeek(TODAY)};
+const CATS=[
+  {k:'prev',lbl:'Maintenance préventive',ic:'wrench',c:'var(--t-prev)'},
+  {k:'corr',lbl:'Correctif',ic:'alert',c:'var(--t-corr)'},
+  {k:'insp',lbl:'Inspection',ic:'eye',c:'var(--t-insp)'},
+  {k:'camp',lbl:'Campagne spéciale',ic:'spark',c:'var(--t-camp)'}
+];
+function renderPlan(D){
+  const EV=D.events;
+  $('#y-lbl').textContent=CAL.year;
+
+  // ---- annuelle ----
+  const g={}; CATS.forEach(c=>g[c.k]=Array(12).fill(0));
+  EV.forEach(e=>{if(e.date.getFullYear()===CAL.year)g[e.type][e.date.getMonth()]++;});
+  const colT=Array(12).fill(0); CATS.forEach(c=>g[c.k].forEach((v,i)=>colT[i]+=v));
+  const mx=Math.max(1,...CATS.flatMap(c=>g[c.k]));
+  const wash=(v,c)=>v===0?'':`background:color-mix(in srgb, ${c} ${Math.round(7+v/mx*30)}%, var(--paper))`;
+  const thisY=CAL.year===TODAY.getFullYear();
+  $('#year').innerHTML=`<table>
+    <thead><tr><th class="cg">Catégorie</th>${MOIS.map((m,i)=>
+      `<th class="num" style="text-align:center${thisY&&i===TODAY.getMonth()?';color:var(--malachite)':''}">${m}</th>`).join('')}
+      <th class="num" style="text-align:center">Total</th></tr></thead>
+    <tbody>${CATS.map(c=>{
+      const row=g[c.k], t=row.reduce((a,b)=>a+b,0);
+      return `<tr><td class="cg"><span class="cat-k"><span class="sw" style="background:${c.c}"></span>${ic(c.ic)}${c.lbl}</span></td>
+        ${row.map((v,i)=>`<td class="mo${v===0?' nil':''}${thisY&&i===TODAY.getMonth()?' now':''}" style="${wash(v,c.c)}"
+          ${v?`data-month="${i}" data-tt="${esc(c.lbl)}|${MOIS[i]} ${CAL.year} — ${v} tâche${v>1?'s':''} · cliquez pour ouvrir"`:''}>
+          ${v?`<button data-month="${i}">${v}</button>`:'<span style="display:block;padding:8px 12px">·</span>'}</td>`).join('')}
+        <td class="mo" style="font-weight:600"><span style="display:block;padding:8px 12px">${t}</span></td></tr>`;
+    }).join('')}</tbody>
+    <tfoot><tr><td>Total des tâches</td>${colT.map(v=>`<td>${v||'·'}</td>`).join('')}<td>${colT.reduce((a,b)=>a+b,0)}</td></tr></tfoot></table>`;
+
+  // ---- mensuelle ----
+  const y=CAL.year,m=CAL.month;
+  $('#m-lbl').textContent=`${MOIS[m]} ${y}`;
+  const first=new Date(y,m,1), last=new Date(y,m+1,0), start=startOfWeek(first);
+  const byDay={}; EV.forEach(e=>{const k=ymd(e.date);(byDay[k]=byDay[k]||[]).push(e);});
+  const nM=EV.filter(e=>e.date.getFullYear()===y&&e.date.getMonth()===m).length;
+  $('#m-sub').textContent=`${nM} tâche${nM>1?'s':''}`;
+  let h=JOURS.map(d=>`<div class="dow">${d}</div>`).join('');
+  const cur=new Date(start), weeks=Math.ceil((daysBetween(start,last)+1)/7);
+  for(let i=0;i<weeks*7;i++){
+    const k=ymd(cur), out=cur.getMonth()!==m, td=k===ymd(TODAY), evs=byDay[k]||[];
+    const tag2=evs.length?'button':'div';
+    h+=`<${tag2} class="day${out?' pale':''}${td?' today':''}"${evs.length?` data-day="${k}"`:''}>
+      <span class="dnum">${cur.getDate()}</span>
+      ${evs.slice(0,4).map(e=>`<span class="chip k-${TYPES[e.type].cls}" data-tt="${esc(e.titre)}|${esc(e.equip)} · ${esc(e.resp)} · ${esc(e.statut)}"><span class="pip"></span><span class="tx">${e.fleet?`<b>${esc(e.fleet)}</b> `:''}${esc(e.titre)}</span></span>`).join('')}
+      ${evs.length>4?`<span class="chip-more">+ ${evs.length-4}</span>`:''}</${tag2}>`;
+    cur.setDate(cur.getDate()+1);
+  }
+  $('#month').innerHTML=h;
+
+  // ---- hebdomadaire ----
+  const ws=CAL.week, we=new Date(ws); we.setDate(we.getDate()+6);
+  $('#w-lbl').textContent=`${ws.getDate()} – ${we.getDate()} ${MOIS_A[we.getMonth()]}`;
+  const wEv=EV.filter(e=>e.date>=ws&&e.date<=we);
+  $('#w-sub').textContent=`${wEv.length} tâche${wEv.length>1?'s':''}`;
+  const HRS=[6,7,8,9,10,11,12,13,14,15,16,17];
+  let w=`<div class="wh">Heure</div>`;
+  for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(d.getDate()+i);
+    w+=`<div class="wh${ymd(d)===ymd(TODAY)?' now':''}">${JOURS[i]}<b>${d.getDate()}</b></div>`;}
+  const slots={};
+  wEv.forEach((e,i)=>{const di=daysBetween(ws,e.date);const hh=HRS[(i*3+di)%HRS.length];
+    (slots[di+'_'+hh]=slots[di+'_'+hh]||[]).push(e);});
+  HRS.forEach(hh=>{
+    w+=`<div class="hour">${String(hh).padStart(2,'0')}:00</div>`;
+    for(let d=0;d<7;d++){
+      const dd=new Date(ws);dd.setDate(dd.getDate()+d);
+      const evs=slots[d+'_'+hh]||[];
+      w+=`<div class="slotc${ymd(dd)===ymd(TODAY)?' now':''}">${evs.map(e=>{
+        const t=TYPES[e.type];
+        return `<button class="wchip k-${t.cls}"${e.fleet?` data-fleet="${esc(e.fleet)}"`:''}
+          data-tt="${esc(e.titre)}|${esc(e.equip)} · ${esc(e.resp)} · ${esc(e.statut)}">
+          <b>${esc(e.titre)}</b><span>${esc(e.fleet||e.equip)}</span></button>`;}).join('')}</div>`;
+    }
+  });
+  $('#week').innerHTML=w;
+
+  // ---- liste semaine ----
+  const q=norm($('#wl-q').value||'');
+  const wl=wEv.filter(e=>!q||norm([e.titre,e.equip,e.resp,e.fleet].join(' ')).includes(q));
+  $('#wl-sub').textContent=`du ${fdate(ws)} au ${fdate(we)}`;
+  $('#wl').innerHTML=tbl([
+    {t:'Date',r:e=>`<span class="mono">${fdate(e.date)}</span>`,s:e=>e.date?.getTime()},
+    {t:'Engin',r:e=>fleetBadge(e.fleet),s:e=>e.fleet},
+    {t:'Tâche',hd:true,r:e=>esc(e.titre),s:e=>e.titre},
+    {t:'Équipement',r:e=>esc(e.equip||'—'),s:e=>e.equip},
+    {t:'Catégorie',r:e=>catTag(e.type),s:e=>TYPES[e.type].lbl},
+    {t:'Responsable',r:e=>esc(e.resp||'—'),s:e=>e.resp},
+    {t:'Statut',r:e=>tag(e.statut),s:e=>e.statut},
+    {t:'Source',r:e=>`<span class="origin">${esc(e.src)}</span>`}
+  ], wl, {key:'wl',fleet:e=>e.fleet,empty:'Aucune tâche cette semaine',emptySub:'Naviguez avec les flèches ou retirez les filtres'});
+
+  $('#plan-keys').innerHTML=CATS.map(c=>`<div><span class="sw" style="background:${c.c}"></span><b>${c.lbl}</b></div>`).join('')
+    +`<div style="margin-left:auto;color:var(--graphite-4)">Toutes les tâches — PM, correctif, inspection, campagne — sont consolidées dans les trois vues.</div>`;
+}
+
+/* =====================================================================
+   PRÉVENTIF
+   ===================================================================== */
+let PREV_F='all', PREV_ROWS=[];
+function renderPrev(D,K){
+  const r=K.respect;
+  $('#prev-kpi').innerHTML=[
+    stat({k:`Sous ${CONFIG.seuilAlerteH} h`,ic:'bell',v:nf(K.pmProche),d:'Dans le seuil d\'alerte',tone:K.pmProche?'ct':'cl'}),
+    stat({k:'Dues aujourd\'hui',ic:'calendar',v:nf(K.pmDuAuj.length),d:fdate(TODAY),tone:K.pmDuAuj.length?'ct':'cl'}),
+    stat({k:'Retardées',ic:'clock',v:nf(K.pmRetard),d:'Index cible dépassé',tone:K.pmRetard?'hz':'cl'}),
+    stat({k:'Terminées ce mois',ic:'check',v:nf(K.pmMois.length),d:`${MOIS[TODAY.getMonth()]} ${TODAY.getFullYear()}`,tone:'cl'}),
+    stat({k:'Respect du programme',ic:'target',v:r==null?'—':nf1(r),unit:r==null?'':'%',
+          d:r==null?'Pas encore mesurable':'PM terminées à l\'échéance',tone:r==null?'ml':r>=90?'cl':r>=75?'ct':'hz'})
+  ].join('');
+
+  // anneau des échéances
+  const nOk=K.pmOkParc.length,nSo=K.pmProcheParc.length,nLa=K.pmRetardParc.length,tt=nOk+nSo+nLa;
+  const R=50,C=2*Math.PI*R; let off=0;
+  const arcs=[[nLa,'var(--hazard)'],[nSo,'var(--caution)'],[nOk,'var(--clear)']].filter(a=>a[0]>0).map(([v,c])=>{
+    const len=tt?v/tt*C:0;
+    const s=`<circle r="${R}" cx="62" cy="62" fill="none" stroke="${c}" stroke-width="13" stroke-linecap="butt"
+      stroke-dasharray="${len} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 62 62)"/>`;
+    off+=len; return s;}).join('');
+  $('#prev-ring').innerHTML = tt? `<div class="ring">
+      <svg width="124" height="124" viewBox="0 0 124 124"><circle r="${R}" cx="62" cy="62" fill="none" stroke="var(--paper-4)" stroke-width="13"/>${arcs}</svg>
+      <div style="flex:1"><div class="tray">
+        <button data-go="prev:ok"><span class="k"><span class="pip" style="background:var(--clear)"></span>Cycle normal</span><span class="v">${nf(nOk)}</span></button>
+        <button data-go="prev:soon"><span class="k"><span class="pip" style="background:var(--caution)"></span>Sous seuil</span><span class="v">${nf(nSo)}</span></button>
+        <button data-go="prev:late"><span class="k"><span class="pip" style="background:var(--hazard)"></span>Dépassé</span><span class="v">${nf(nLa)}</span></button>
+        <div><span class="k">Engins suivis</span><span class="v">${nf(tt)} / ${nf(K.total)}</span></div>
+      </div></div></div>
+      <div class="murmur">Calculable uniquement pour les engins dont l'index actuel et l'index cible sont renseignés.</div>`
+    : voidBox('Aucun index horaire renseigné','Colonnes « Index actuel » et « Prochain entretien »');
+
+  // réalisé vs planifié
+  const Y=TODAY.getFullYear(), pl=Array(12).fill(0), re=Array(12).fill(0);
+  D.pm.forEach(p=>{if(p.date&&p.date.getFullYear()===Y)pl[p.date.getMonth()]++;
+    const d=p.fin||p.debut; if(isClosed(p.statut)&&d&&d.getFullYear()===Y)re[d.getMonth()]++;});
+  D.parc.forEach(e=>{if(e.datePrevue&&e.datePrevue.getFullYear()===Y)pl[e.datePrevue.getMonth()]++;});
+  const mm=Math.max(1,...pl,...re), any=pl.some(v=>v)||re.some(v=>v);
+  $('#prev-rvp').innerHTML = any? `<div class="cols">${MOIS_A.map((m,i)=>`
+      <div class="col"><div class="col-st">
+        <div class="col-b" style="height:${pl[i]/mm*100}%;background:var(--t-prev)" data-tt="Planifié|${m} ${Y} — ${pl[i]} PM">${pl[i]?`<span class="cap">${pl[i]}</span>`:''}</div>
+        <div class="col-b" style="height:${re[i]/mm*100}%;background:var(--clear)" data-tt="Réalisé|${m} ${Y} — ${re[i]} PM">${re[i]?`<span class="cap">${re[i]}</span>`:''}</div>
+      </div><div class="col-k${i===TODAY.getMonth()?' now':''}">${m}</div></div>`).join('')}</div>
+      <div class="keys"><div><span class="sw" style="background:var(--t-prev)"></span><b>Planifié</b></div><div><span class="sw" style="background:var(--clear)"></span><b>Réalisé</b></div></div>`
+    : voidBox(`Aucune date planifiée pour ${Y}`,'Renseignez « Date planifiée » au plan préventif');
+
+  // rapport PM
+  let rows=D.parc.filter(e=>e.restant!=null);
+  if(PREV_F==='late')rows=rows.filter(e=>e.restant<0);
+  if(PREV_F==='soon')rows=rows.filter(e=>e.restant>=0&&e.restant<=CONFIG.seuilAlerteH);
+  if(PREV_F==='ok')rows=rows.filter(e=>e.restant>CONFIG.seuilAlerteH);
+  rows=[...rows].sort((a,b)=>a.restant-b.restant);
+  PREV_ROWS=rows;
+  const svc=e=>e.intervalle&&e.cible?`Entretien ${nf(e.intervalle)} h`:(e.typeDernier?`Après ${nf(num(e.typeDernier))} h`:'—');
+  const jrs=e=>(e.restant==null||!e.hParJour)?'—':nf1(e.restant/e.hParJour)+' j';
+  $('#prev-tbl').innerHTML=tbl([
+    {t:'Engin',hd:true,r:e=>fleetBadge(e.id),s:e=>e.id},
+    {t:'Modèle',r:e=>esc(e.modele||'—'),s:e=>e.modele},
+    {t:'Site',r:e=>esc(e.site),s:e=>e.site},
+    {t:'Statut',r:e=>tag(e.statut),s:e=>e.statut},
+    {t:'Compteur',r:e=>`<div style="min-width:150px">${meter(e)}</div>`,s:e=>e.restant},
+    {t:'Jours rest.',num:true,r:e=>jrs(e),s:e=>(e.restant!=null&&e.hParJour)?e.restant/e.hParJour:null},
+    {t:'Prochain service',r:e=>esc(svc(e)),s:e=>e.intervalle},
+    {t:'Date prévue',r:e=>`<span class="mono">${fdate(e.datePrevue)}</span>`,s:e=>e.datePrevue?.getTime()},
+    {t:'Alerte',r:e=>e.restant<0?'<span class="tag g-hz"><span class="pip"></span>DÉPASSÉ</span>'
+      :e.restant<=CONFIG.seuilAlerteH?'<span class="tag g-ct"><span class="pip"></span>À PLANIFIER</span>'
+      :'<span class="tag g-cl"><span class="pip"></span>CYCLE NORMAL</span>',s:e=>e.restant}
+  ], rows, {key:'prev',fleet:e=>e.id,empty:'Aucun engin dans cette catégorie'});
+
+  $('#prev-pm').innerHTML=tbl([
+    {t:'ID',hd:true,r:p=>esc(p.id||'—'),s:p=>p.id},
+    {t:'Engin',r:p=>fleetBadge(p.fleet),s:p=>p.fleet},
+    {t:'Équipement',r:p=>esc(p.equip||'—'),s:p=>p.equip},
+    {t:'Type entretien',r:p=>esc(p.typeEnt||'—'),s:p=>p.typeEnt},
+    {t:'Index cible',num:true,r:p=>nf(p.idxCible),s:p=>p.idxCible},
+    {t:'Index actuel',num:true,r:p=>nf(p.idxActuel),s:p=>p.idxActuel},
+    {t:'Restant',num:true,r:p=>restCell(p.restant),s:p=>p.restant},
+    {t:'Date planifiée',r:p=>`<span class="mono">${fdate(p.date)}</span>`,s:p=>p.date?.getTime()},
+    {t:'Équipe',r:p=>esc(p.equipe),s:p=>p.equipe},
+    {t:'Priorité',r:p=>p.prio?tag(p.prio):'—',s:p=>p.prio},
+    {t:'Statut',r:p=>tag(p.statut),s:p=>p.statut}
+  ], D.pm, {key:'pm',fleet:p=>p.fleet,empty:'Aucune intervention saisie',emptySub:'Feuille Plan_Preventif'});
+}
+
+/* =====================================================================
+   CORRECTIF & ANOMALIES
+   ===================================================================== */
+let SYS_F='';
+function renderCorr(D,K){
+  $('#corr-kpi').innerHTML=[
+    stat({k:'Ouverts',ic:'alert',v:nf(K.coOuv.length),d:'OT non clôturés',tone:K.coOuv.length?'ct':'cl'}),
+    stat({k:'Planifiés',ic:'calendar',v:nf(K.coPlan.length),d:'Date fixée',tone:'ml'}),
+    stat({k:'En cours',ic:'play',v:nf(K.coCours.length),d:'Intervention démarrée',tone:'ml'}),
+    stat({k:'Reportés',ic:'pause',v:nf(K.coRep.length),d:'À replanifier',tone:K.coRep.length?'ct':'cl'}),
+    stat({k:'Clôturés',ic:'check',v:nf(K.coClos.length),d:'Travaux terminés',tone:'cl'})
+  ].join('');
+  $('#ano-kpi').innerHTML=[
+    stat({k:'Nouvelles',ic:'flag',v:nf(K.anNouv.length),d:'En attente de triage',tone:K.anNouv.length?'ct':'cl'}),
+    stat({k:'Critiques',ic:'alert',v:nf(K.anCrit.length),d:'Sévérité critique non résolue',tone:K.anCrit.length?'hz':'cl'}),
+    stat({k:'Bloquantes',ic:'ban',v:nf(K.anBloq.length),d:'Équipement inutilisable',tone:K.anBloq.length?'hz':'cl'}),
+    stat({k:'Surveillées',ic:'eye',v:nf(K.anSurv.length),d:'En observation',tone:'ml'})
+  ].join('');
+
+  // Pareto : barres classées + cumul annoté (axe unique, pas de double échelle)
+  const SYS=['Hydraulique','Moteur','Freinage','Transmission','Pneumatique','Électrique'];
+  const cnt={};
+  D.anomalies.forEach(a=>{const s=a.systeme||'Non précisé';
+    const hit=SYS.find(x=>norm(x)===norm(s))||s; cnt[hit]=(cnt[hit]||0)+1;});
+  SYS.forEach(s=>{if(!(s in cnt))cnt[s]=0;});
+  const ord=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const tot=ord.reduce((s,x)=>s+x[1],0);
+  let cum=0;
+  const items=ord.map(([l,v])=>{cum+=v;
+    return {l,v,c:SYS_F&&norm(SYS_F)!==norm(l)?'var(--graphite-4)':'var(--malachite)',
+            x:tot?`cumul ${Math.round(cum/tot*100)} %`:'',go:'sys:'+l};});
+  $('#pareto').innerHTML = tot? plots(items) : voidBox('Aucune anomalie enregistrée');
+  $('#pareto-note').textContent = tot
+    ? `${tot} anomalie${tot>1?'s':''} sur ${ord.filter(o=>o[1]>0).length} systèmes. Le cumul indique la part couverte par les causes au-dessus.` : '';
+
+  const sev=[['Critique','var(--hazard)'],['Majeure','var(--caution)'],['Modérée','var(--t-prev)'],['Mineure','var(--clear)']];
+  const sc={}; D.anomalies.forEach(a=>{const k=sev.find(s=>norm(s[0])===norm(a.sev));sc[k?k[0]:'Non classée']=(sc[k?k[0]:'Non classée']||0)+1;});
+  $('#ano-sev').innerHTML = D.anomalies.length
+    ? plots(sev.map(s=>({l:s[0],v:sc[s[0]]||0,c:s[1]})).concat(sc['Non classée']?[{l:'Non classée',v:sc['Non classée'],c:'var(--graphite-4)'}]:[]))
+    : voidBox('Aucune anomalie');
+
+  let an=D.anomalies;
+  if(SYS_F) an=an.filter(a=>norm(a.systeme)===norm(SYS_F));
+  $('#ano-sub').textContent = SYS_F? `filtré sur ${SYS_F}` : '';
+  $('#ano-reset').hidden = !SYS_F;
+  ANO_ROWS=an;
+  $('#ano-tbl').innerHTML=tbl([
+    {t:'ID',hd:true,r:a=>esc(a.id),s:a=>a.id},
+    {t:'Date',r:a=>`<span class="mono">${fdate(a.date)}</span>`,s:a=>a.date?.getTime()},
+    {t:'Engin',r:a=>fleetBadge(a.fleet),s:a=>a.fleet},
+    {t:'Système',r:a=>esc(a.systeme),s:a=>a.systeme},
+    {t:'Description',r:a=>esc(a.desc||'—'),s:a=>a.desc},
+    {t:'Sévérité',r:a=>sevTag(a.sev),s:a=>({critique:0,majeure:1,moderee:2,mineure:3}[norm(a.sev)]??9)},
+    {t:'Action recommandée',r:a=>esc(a.action||'—')},
+    {t:'Pièces',r:a=>esc(a.dispoP||a.piecesReq||'—'),s:a=>a.dispoP},
+    {t:'Statut',r:a=>tag(a.statut),s:a=>a.statut},
+    {t:'Âge',num:true,r:a=>a.age!=null?a.age+' j':'—',s:a=>a.age}
+  ], an, {key:'ano',fleet:a=>a.fleet,empty:SYS_F?'Aucune anomalie sur ce système':'Aucune anomalie enregistrée',emptySub:'Feuille Anomalies'});
+
+  $('#corr-tbl').innerHTML=tbl([
+    {t:'ID',hd:true,r:c=>esc(c.id),s:c=>c.id},
+    {t:'Source',r:c=>esc(c.source),s:c=>c.source},
+    {t:'Engin',r:c=>fleetBadge(c.fleet),s:c=>c.fleet},
+    {t:'Travaux',r:c=>esc(c.travaux||'—'),s:c=>c.travaux},
+    {t:'Priorité',r:c=>c.prio?tag(c.prio):'—',s:c=>c.prio},
+    {t:'Date planifiée',r:c=>`<span class="mono">${fdate(c.date)}</span>`,s:c=>c.date?.getTime()},
+    {t:'Début réel',r:c=>`<span class="mono">${fdate(c.debut)}</span>`,s:c=>c.debut?.getTime()},
+    {t:'Équipe',r:c=>esc(c.equipe),s:c=>c.equipe},
+    {t:'Responsable',r:c=>esc(c.resp),s:c=>c.resp},
+    {t:'Arrêt',r:c=>esc(c.arret||'—')},
+    {t:'Pièces',r:c=>esc(c.pieces||'—')},
+    {t:'Statut',r:c=>tag(c.statut),s:c=>c.statut}
+  ], D.correctif, {key:'corr',fleet:c=>c.fleet,empty:'Aucun correctif planifié',emptySub:'Feuille Planning_Correctif'});
+}
+let ANO_ROWS=[];
+
+/* =====================================================================
+   BACKLOG · MAGASIN · INDICATEURS · HISTORIQUE
+   ===================================================================== */
+function renderBack(D,K){
+  $('#back-kpi').innerHTML=[
+    stat({k:'Backlog total',ic:'stack',v:nf(K.bk.length),d:'OT ouverts',tone:K.bk.length?'ct':'cl'}),
+    stat({k:'> 30 jours',ic:'calendar',v:nf(K.bk30.length),d:'Travaux vieillissants',tone:K.bk30.length?'ct':'cl'}),
+    stat({k:'> 60 jours',ic:'alert',v:nf(K.bk60.length),d:'Critiques',tone:K.bk60.length?'hz':'cl'}),
+    stat({k:'Sans pièce',ic:'box',v:nf(K.bkSansP.length),d:'Attente magasin',tone:K.bkSansP.length?'hz':'cl',go:'mag'})
+  ].join('');
+  const buckets=[['0 – 7 jours',b=>(b.age??0)<=7,'var(--clear)'],['8 – 30 jours',b=>(b.age??0)>7&&(b.age??0)<=30,'var(--malachite)'],
+    ['31 – 60 jours',b=>(b.age??0)>30&&(b.age??0)<=60,'var(--caution)'],['> 60 jours',b=>(b.age??0)>60,'var(--hazard)']];
+  $('#back-age').innerHTML=K.bk.length?plots(buckets.map(([l,f,c])=>({l,v:K.bk.filter(f).length,c}))):voidBox('Backlog vide');
+  const org={}; K.bk.forEach(b=>{const o=b.origine||'—';org[o]=(org[o]||0)+1;});
+  $('#back-org').innerHTML=K.bk.length?plots(Object.entries(org).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({l,v}))):voidBox('Backlog vide');
+  $('#back-tbl').innerHTML=tbl([
+    {t:'ID',hd:true,r:b=>esc(b.id),s:b=>b.id},
+    {t:'Créé le',r:b=>`<span class="mono">${fdate(b.cree)}</span>`,s:b=>b.cree?.getTime()},
+    {t:'Engin',r:b=>fleetBadge(b.fleet),s:b=>b.fleet},
+    {t:'Type',r:b=>esc(b.type||'—'),s:b=>b.type},
+    {t:'Description',r:b=>esc(b.desc||'—'),s:b=>b.desc},
+    {t:'Origine',r:b=>esc(b.origine),s:b=>b.origine},
+    {t:'Priorité',r:b=>b.prio?tag(b.prio):'—',s:b=>b.prio},
+    {t:'Criticité',r:b=>sevTag(b.crit)},
+    {t:'Pièces',r:b=>esc(b.dispoP||'—')},
+    {t:'Statut',r:b=>tag(b.statut),s:b=>b.statut},
+    {t:'Âge',num:true,s:b=>b.age,r:b=>{const a=b.age;if(a==null)return '—';
+      const c=a>60?'var(--hazard-ink)':a>30?'var(--caution-ink)':'var(--graphite)';
+      return `<span style="color:${c};font-weight:600">${a} j</span>`;}}
+  ], D.backlog, {key:'back',fleet:b=>b.fleet,empty:'Aucune activité au backlog',emptySub:'Feuille Backlog_Activites'});
+}
+
+function renderMag(D,K){
+  const manq=D.pieces.reduce((s,p)=>s+(p.qManq||0),0);
+  const aCom=K.pcACom, route=D.pieces.filter(p=>p.dPrevue&&!p.dReelle);
+  $('#mag-kpi').innerHTML=[
+    stat({k:'OT bloqués',ic:'ban',v:nf(K.pcAtt.length),d:'Faute de pièces',tone:K.pcAtt.length?'hz':'cl'}),
+    stat({k:'Références suivies',ic:'box',v:nf(D.pieces.length),d:'Lignes magasin',tone:'ml'}),
+    stat({k:'À commander',ic:'cart',v:nf(aCom.length),d:`${nf(manq)} pièce(s) manquante(s)`,tone:aCom.length?'ct':'cl'}),
+    stat({k:'Attente réception',ic:'truck',v:nf(route.length),d:'Commandes en cours',tone:'ml'})
+  ].join('');
+  const bl=[
+    ...K.bkSansP.map(b=>({o:'Backlog',id:b.id,fleet:b.fleet,tr:b.desc||b.type,p:b.piecesReq||b.dispoP,st:b.statut,age:b.age})),
+    ...D.correctif.filter(c=>/manqu|attente|commander|rupture|indispo/.test(norm(c.pieces))&&!isClosed(c.statut))
+      .map(c=>({o:'Correctif',id:c.id,fleet:c.fleet,tr:c.travaux,p:c.pieces,st:c.statut,age:null})),
+    ...D.anomalies.filter(a=>/manqu|commander|attente|rupture/.test(norm(a.dispoP))&&!isClosed(a.statut))
+      .map(a=>({o:'Anomalie',id:a.id,fleet:a.fleet,tr:a.desc,p:a.piecesReq||a.dispoP,st:a.statut,age:a.age})),
+    ...D.dispo.filter(d=>d.piecesManq&&!d.dRemise)
+      .map(d=>({o:'Immobilisation',id:d.fleet,fleet:d.fleet,tr:d.interv||d.cause,p:d.piecesManq,st:d.statut,age:d.duree}))
+  ];
+  $('#mag-blk').innerHTML=tbl([
+    {t:'Origine',r:x=>`<span class="tag g-ml"><span class="pip"></span>${esc(x.o)}</span>`,s:x=>x.o},
+    {t:'ID',hd:true,r:x=>esc(x.id||'—'),s:x=>x.id},
+    {t:'Engin',r:x=>fleetBadge(x.fleet),s:x=>x.fleet},
+    {t:'Travaux',r:x=>esc(x.tr||'—'),s:x=>x.tr},
+    {t:'Pièces manquantes',r:x=>esc(x.p||'—')},
+    {t:'Statut',r:x=>tag(x.st),s:x=>x.st},
+    {t:'Âge',num:true,r:x=>x.age!=null?x.age+' j':'—',s:x=>x.age}
+  ], bl, {key:'blk',fleet:x=>x.fleet,empty:'Aucun travail bloqué',emptySub:'Aucune pièce manquante déclarée'});
+  $('#mag-tbl').innerHTML=tbl([
+    {t:'Référence',hd:true,r:p=>esc(p.ref),s:p=>p.ref},
+    {t:'Désignation',r:p=>esc(p.desig||'—'),s:p=>p.desig},
+    {t:'Engin',r:p=>fleetBadge(p.fleet),s:p=>p.fleet},
+    {t:'Qté requise',num:true,r:p=>nf(p.qReq),s:p=>p.qReq},
+    {t:'Qté stock',num:true,r:p=>nf(p.qStock),s:p=>p.qStock},
+    {t:'Manquant',num:true,s:p=>p.qManq,r:p=>{const q=p.qManq||0;
+      return q>0?`<span style="color:var(--hazard-ink);font-weight:600">${nf(q)}</span>`:nf(q);}},
+    {t:'Demande achat',r:p=>p.demande?tag(p.demande):'—',s:p=>p.demande},
+    {t:'Réception prévue',r:p=>`<span class="mono">${fdate(p.dPrevue)}</span>`,s:p=>p.dPrevue?.getTime()},
+    {t:'Fournisseur',r:p=>esc(p.fourn),s:p=>p.fourn},
+    {t:'Statut',r:p=>tag(p.statut||p.demande)}
+  ], D.pieces, {key:'mag',fleet:p=>p.fleet,empty:'Aucune pièce suivie',emptySub:'Feuille Pieces'});
+}
+
+let KPI_ROWS=[];
+function renderKPI(D,K){
+  const judge=(v,g,w,inv)=>{if(v==null)return['mt','—'];
+    const ok=inv?v<=g:v>=g, mid=inv?v<=w:v>=w;
+    return ok?['cl','Conforme']:mid?['ct','Surveillance']:['hz','Critique'];};
+  const L=[
+    ['Parc & disponibilité','Parc total',K.total,'Nombre total d\'engins',['mt','—']],
+    [null,'Disponible',K.dispo,'Engins opérationnels',judge(K.total?K.dispo/K.total*100:null,85,70)],
+    [null,'Immobilisé',K.immo,'Engins indisponibles',judge(K.immo,0,3,true)],
+    [null,'Disponibilité (%)',K.total?nf1(K.tauxDispo)+' %':'—','Disponibles / parc total',judge(K.tauxDispo,85,70)],
+    ['Maintenance préventive','PM planifiées',K.pmPlan.length,'PM programmées',['mt','—']],
+    [null,'PM réalisées',K.pmFait.length,'Nombre exécuté',['mt','—']],
+    [null,'PM en retard',K.pmRetard,'Dépassant l\'échéance',judge(K.pmRetard,0,2,true)],
+    [null,`PM sous ${CONFIG.seuilAlerteH} h`,K.pmProche,'Dans le seuil d\'alerte',judge(K.pmProche,0,3,true)],
+    [null,'Respect du programme',K.respect==null?'—':nf1(K.respect)+' %','PM terminées à l\'échéance',judge(K.respect,90,75)],
+    ['Correctif & anomalies','Correctifs ouverts',K.coOuv.length,'OT correctifs',judge(K.coOuv.length,0,3,true)],
+    [null,'Correctifs en cours',K.coCours.length,'Intervention démarrée',['mt','—']],
+    [null,'Correctifs reportés',K.coRep.length,'À replanifier',judge(K.coRep.length,0,2,true)],
+    [null,'Anomalies nouvelles',K.anNouv.length,'En attente de triage',judge(K.anNouv.length,0,3,true)],
+    [null,'Anomalies critiques',K.anCrit.length,'Risques opérationnels',judge(K.anCrit.length,0,1,true)],
+    [null,'Anomalies bloquantes',K.anBloq.length,'Équipement inutilisable',judge(K.anBloq.length,0,1,true)],
+    ['Backlog & magasin','Backlog total',K.bk.length,'Travaux en attente',judge(K.bk.length,0,5,true)],
+    [null,'Backlog > 30 jours',K.bk30.length,'Travaux vieillissants',judge(K.bk30.length,0,2,true)],
+    [null,'Backlog > 60 jours',K.bk60.length,'Critiques',judge(K.bk60.length,0,1,true)],
+    [null,'Backlog sans pièce',K.bkSansP.length,'Attente magasin',judge(K.bkSansP.length,0,1,true)],
+    [null,'Pièces en attente',K.pcAtt.length,'OT bloqués faute de pièces',judge(K.pcAtt.length,0,2,true)]
+  ];
+  KPI_ROWS=L;
+  let h=`<thead><tr><th>Indicateur</th><th class="num">Valeur</th><th>Description</th><th>État</th></tr></thead><tbody>`;
+  L.forEach(([g,k,v,d,s])=>{
+    if(g)h+=`<tr><td colspan="4" style="background:var(--paper-2);font-weight:600;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--graphite-3);padding:7px 12px">${esc(g)}</td></tr>`;
+    h+=`<tr><td class="hd">${esc(k)}</td><td class="num" style="font-weight:600;font-size:14px">${typeof v==='number'?nf(v):esc(v)}</td>
+      <td style="color:var(--graphite-3)">${esc(d)}</td>
+      <td>${s[0]==='mt'?'<span style="color:var(--graphite-4)">—</span>':`<span class="tag g-${s[0]}"><span class="pip"></span>${s[1]}</span>`}</td></tr>`;
+  });
+  $('#kpi-tbl').innerHTML=h+'</tbody>';
+
+  $('#dispo-tbl').innerHTML=tbl([
+    {t:'Engin',hd:true,r:d=>fleetBadge(d.fleet),s:d=>d.fleet},
+    {t:'Statut',r:d=>tag(d.statut),s:d=>d.statut},
+    {t:'Date arrêt',r:d=>`<span class="mono">${fdate(d.dArret)}</span>`,s:d=>d.dArret?.getTime()},
+    {t:'Cause',r:d=>esc(d.cause||'—'),s:d=>d.cause},
+    {t:'Intervention',r:d=>esc(d.interv||'—')},
+    {t:'Pièces manquantes',r:d=>esc(d.piecesManq||'—')},
+    {t:'Remise prévue',r:d=>`<span class="mono">${fdate(d.dPrevue)}</span>`,s:d=>d.dPrevue?.getTime()},
+    {t:'Durée',num:true,r:d=>d.duree!=null?d.duree+' j':'—',s:d=>d.duree}
+  ], D.dispo, {key:'dispo',fleet:d=>d.fleet,empty:'Aucune immobilisation',emptySub:'Feuille Disponibilite'});
+
+  const mod={}; D.parc.forEach(e=>{const m=e.modele||'—';mod[m]=(mod[m]||0)+1;});
+  $('#synth').innerHTML=[
+    ['Engins enregistrés',nf(K.total)],['Avec suivi horaire',`${nf(K.suivis.length)} / ${nf(K.total)}`],
+    ['Modèles distincts',nf(Object.keys(mod).length)],['Sites',nf(new Set(D.parc.map(e=>e.site)).size)],
+    ['Interventions historisées',nf(D.historique.length)],
+    ['Seuil d\'alerte PM',CONFIG.seuilAlerteH+' h'],['Seuil immobilisation',CONFIG.seuilImmobH+' h'],
+    ['Seuil backlog',CONFIG.seuilBacklogJ+' jours']
+  ].map(([k,v])=>`<div><span class="k">${esc(k)}</span><span class="v">${v}</span></div>`).join('');
+  const top=Object.entries(mod).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  $('#top-mod').innerHTML=top.length?plots(top.map(([l,v])=>({l,v,go:'flotte:'+l}))):voidBox('Aucun modèle');
+}
+
+let HIST_ROWS=[];
+function renderHist(D,K){
+  const H=[
+    ...D.historique.map(h=>({date:h.date,type:'prev',src:'Historique',fleet:h.fleet,equip:h.equip,
+      act:h.travaux||h.typeEnt,det:[h.piecesCons&&'Pièces : '+h.piecesCons,h.anomalies&&'Anomalie : '+h.anomalies,h.reco&&'Reco : '+h.reco].filter(Boolean).join(' · '),
+      qui:h.tech,duree:h.duree,statut:'Terminé'})),
+    ...D.pm.filter(p=>isClosed(p.statut)).map(p=>({date:p.fin||p.debut||p.date,type:'prev',src:'Plan préventif',
+      fleet:p.fleet,equip:p.equip,act:p.typeEnt||'Entretien préventif',det:p.obs||'',qui:p.equipe,duree:p.duree,statut:p.statut})),
+    ...D.correctif.map(c=>({date:c.fin||c.debut||c.date,type:'corr',src:'Planning correctif',fleet:c.fleet,
+      equip:c.equip,act:c.travaux,det:c.com||'',qui:c.equipe,duree:null,statut:c.statut})),
+    ...D.backlog.map(b=>({date:b.date||b.cree,type:typeOf(b.type),src:'Backlog',fleet:b.fleet,equip:b.equip,
+      act:b.desc||b.type,det:b.com||'',qui:b.resp,duree:b.duree,statut:b.statut})),
+    ...D.anomalies.map(a=>({date:a.date,type:'insp',src:'Anomalies',fleet:a.fleet,equip:a.equip,act:a.desc,
+      det:[a.systeme,a.sev&&'Sévérité '+a.sev,a.action].filter(Boolean).join(' · '),qui:a.par,duree:a.duree,statut:a.statut})),
+    ...D.dispo.map(d=>({date:d.dArret,type:'corr',src:'Disponibilité',fleet:d.fleet,equip:d.equip,
+      act:d.cause||'Immobilisation',det:[d.interv,d.piecesManq&&'Pièces : '+d.piecesManq].filter(Boolean).join(' · '),
+      qui:d.resp,duree:d.duree!=null?d.duree*24:null,statut:d.statut}))
+  ].filter(x=>x.date||x.act).sort((a,b)=>(b.date||0)-(a.date||0));
+  HIST_ROWS=H;
+  const hM=H.filter(h=>h.date&&h.date.getMonth()===TODAY.getMonth()&&h.date.getFullYear()===TODAY.getFullYear());
+  const dur=H.reduce((s,h)=>s+(h.duree||0),0);
+  $('#hist-kpi').innerHTML=[
+    stat({k:'Interventions',ic:'layers',v:nf(H.length),d:'Toutes sources confondues',tone:'ml'}),
+    stat({k:'Ce mois',ic:'calendar',v:nf(hM.length),d:`${MOIS[TODAY.getMonth()]} ${TODAY.getFullYear()}`,tone:'ml'}),
+    stat({k:'Heures travaillées',ic:'clock',v:nf1(dur),unit:'h',d:'Durées saisies',tone:'ml'}),
+    stat({k:'Engins concernés',ic:'truck',v:nf(new Set(H.map(h=>h.fleet).filter(Boolean)).size),d:'Au moins une intervention',tone:'ml'})
+  ].join('');
+  const q=norm($('#hist-q').value||'');
+  const rows=H.filter(h=>!q||norm([h.fleet,h.equip,h.act,h.det,h.qui,h.src].join(' ')).includes(q));
+  $('#hist-tbl').innerHTML=tbl([
+    {t:'Date',r:h=>`<span class="mono">${fdate(h.date)}</span>`,s:h=>h.date?.getTime()},
+    {t:'Source',r:h=>`<span class="origin">${esc(h.src)}</span>`,s:h=>h.src},
+    {t:'Catégorie',r:h=>catTag(h.type),s:h=>TYPES[h.type].lbl},
+    {t:'Engin',r:h=>fleetBadge(h.fleet),s:h=>h.fleet},
+    {t:'Intervention',hd:true,r:h=>esc(h.act||'—'),s:h=>h.act},
+    {t:'Détails',r:h=>esc(h.det||'—')},
+    {t:'Intervenant',r:h=>esc(h.qui||'—'),s:h=>h.qui},
+    {t:'Durée',num:true,r:h=>h.duree!=null?nf1(h.duree)+' h':'—',s:h=>h.duree},
+    {t:'Statut',r:h=>tag(h.statut),s:h=>h.statut}
+  ], rows, {key:'hist',fleet:h=>h.fleet,empty:q?'Aucun résultat':'Aucune intervention historisée',
+            emptySub:q?'Essayez un autre terme':'Les interventions apparaîtront au fil des saisies'});
+}
+
+/* =====================================================================
+   TIROIR ENGIN — tout ce qui concerne un numéro de flotte
+   ===================================================================== */
+function openFleet(id){
+  if(!id||!DATA) return;
+  const e=DATA.parc.find(x=>x.id===String(id));
+  const pm=DATA.pm.filter(p=>p.fleet===String(id));
+  const co=DATA.correctif.filter(c=>c.fleet===String(id));
+  const bk=DATA.backlog.filter(b=>b.fleet===String(id));
+  const an=DATA.anomalies.filter(a=>a.fleet===String(id));
+  const pc=DATA.pieces.filter(p=>p.fleet===String(id));
+  const di=DATA.dispo.filter(d=>d.fleet===String(id));
+  const hi=DATA.historique.filter(h=>h.fleet===String(id));
+
+  $('#dr-fleet').textContent=id;
+  $('#dr-name').textContent=e?.modele||an[0]?.equip||co[0]?.equip||'Équipement';
+  $('#dr-meta').innerHTML=[
+    e?.site?`<span>${ic('pin')} ${esc(e.site)}</span>`:'',
+    e?.statut?tag(e.statut):'',
+    e?.resp&&e.resp!=='—'?`<span>${esc(e.resp)}</span>`:''
+  ].filter(Boolean).join('');
+
+  const sec=(t,n,body)=>`<div class="drawer-sec"><h4>${esc(t)}${n!=null?`<span class="ct">${n}</span>`:''}</h4>${body}</div>`;
+  const logs=(items)=>`<div class="log">${items.map(i=>`
+    <div class="log-item"><div class="log-rail ${i.k}"></div><div class="log-b">
+      <div class="t">${esc(i.t)}</div>
+      <div class="m">${i.d?`<span class="dt">${fdate(i.d)}</span>`:''}${i.s?tag(i.s):''}${i.x?`<span>${esc(i.x)}</span>`:''}</div>
+    </div></div>`).join('')}</div>`;
+  const none=t=>`<div class="murmur" style="margin:0">${esc(t)}</div>`;
+
+  let b='';
+  if(e&&e.restant!=null){
+    b+=sec('Compteur horaire',null,`<div style="padding:4px 0 2px">${meter(e)}</div>`);
+  }
+  if(e){
+    b+=sec('Fiche engin',null,`<div class="facts">
+      ${[['Type',e.type||'—'],['Modèle',e.modele||'—'],['Site',e.site],['Statut',e.statut],
+         ['Index actuel',e.index!=null?nf(e.index)+' h':'—',1],['Date index',fdate(e.dateIndex)],
+         ['Intervalle',e.intervalle?nf(e.intervalle)+' h':'—',1],['Prochain entretien',e.cible!=null?nf(e.cible)+' h':'—',1],
+         ['Dernier entretien',fdate(e.dernierDate)],['Index dernier',e.dernierH!=null?nf(e.dernierH)+' h':'—',1],
+         ['Heures / jour',e.hParJour?nf1(e.hParJour)+' h':'—',1],['Date prévue',fdate(e.datePrevue)]]
+       .map(([k,v,m])=>`<div><div class="k">${esc(k)}</div><div class="v${m?' mono':''}">${esc(v)}</div></div>`).join('')}
+    </div>${e.notes?`<div class="murmur">${esc(e.notes)}</div>`:''}`);
+  } else {
+    b+=sec('Fiche engin',null,none('Cet engin n\'est pas au référentiel Parc_Equipements.'));
+  }
+
+  b+=sec('Anomalies',an.length||null, an.length? logs(an.map(a=>({k:'insp',t:a.desc||a.systeme,d:a.date,s:a.statut,
+      x:[a.systeme,a.sev].filter(Boolean).join(' · ')}))) : none('Aucune anomalie signalée.'));
+  b+=sec('Plan préventif',pm.length||null, pm.length? logs(pm.map(p=>({k:'prev',t:p.typeEnt||'Entretien',d:p.date,s:p.statut,
+      x:p.restant!=null?`${nf1(p.restant)} h restantes`:''}))) : none('Aucune intervention préventive saisie.'));
+  b+=sec('Correctifs',co.length||null, co.length? logs(co.map(c=>({k:'corr',t:c.travaux||'Travaux correctifs',d:c.date||c.debut,
+      s:c.statut,x:c.equipe}))) : none('Aucun correctif planifié.'));
+  b+=sec('Backlog',bk.length||null, bk.length? logs(bk.map(x=>({k:typeOf(x.type),t:x.desc||x.type,d:x.cree,s:x.statut,
+      x:x.age!=null?`${x.age} j`:''}))) : none('Aucune activité en attente.'));
+  b+=sec('Pièces',pc.length||null, pc.length? logs(pc.map(p=>({k:'corr',t:p.desig||p.ref,d:p.dPrevue,s:p.statut||p.demande,
+      x:p.qManq?`manque ${nf(p.qManq)}`:''}))) : none('Aucune pièce en suivi.'));
+  b+=sec('Immobilisations',di.length||null, di.length? logs(di.map(d=>({k:'corr',t:d.cause||'Immobilisation',d:d.dArret,
+      s:d.statut,x:d.duree!=null?`${d.duree} j`:''}))) : none('Aucune immobilisation enregistrée.'));
+  b+=sec('Historique',hi.length||null, hi.length? logs(hi.map(h=>({k:'prev',t:h.travaux||h.typeEnt||'Intervention',d:h.date,
+      s:'Terminé',x:[h.tech,h.duree!=null?nf1(h.duree)+' h':''].filter(Boolean).join(' · ')}))) : none('Aucune intervention historisée.'));
+
+  $('#dr-body').innerHTML=b;
+  paintIcons($('#dr-body')); paintIcons($('#dr-meta'));
+  $('#drawer').classList.add('on'); $('#drawer').setAttribute('aria-hidden','false');
+  $('#scrim').classList.add('on');
+  $('#dr-close').focus();
+}
+function closeDrawer(){
+  $('#drawer').classList.remove('on'); $('#drawer').setAttribute('aria-hidden','true');
+  $('#scrim').classList.remove('on');
+}
+
+/* =====================================================================
+   PALETTE DE COMMANDES
+   ===================================================================== */
+let CMD_ITEMS=[], CMD_CUR=0;
+function buildCmd(){
+  const items=[];
+  for(const k in SHEETS) items.push({grp:'Pages',ic:SHEETS[k][2],lb:SHEETS[k][0],rt:'Page',act:()=>goto(k)});
+  if(DATA){
+    DATA.parc.forEach(e=>items.push({grp:'Engins',fleet:e.id,lb:e.modele||'Équipement',
+      rt:[e.site,e.restant!=null?`${nf1(e.restant)} h`:''].filter(Boolean).join(' · '),act:()=>openFleet(e.id)}));
+    [...new Set(DATA.parc.map(e=>e.site).filter(s=>s&&s!=='—'))].sort().forEach(s=>
+      items.push({grp:'Sites',ic:'pin',lb:s,rt:'Filtrer',act:()=>{F.site=s;renderAll();goto('exec');}}));
+  }
+  CMD_ITEMS=items;
+}
+function drawCmd(){
+  const q=norm($('#cmd-q').value);
+  const hits=CMD_ITEMS.filter(i=>!q||norm([i.lb,i.fleet,i.rt,i.grp].join(' ')).includes(q)).slice(0,40);
+  CMD_HITS=hits;
+  if(CMD_CUR>=hits.length) CMD_CUR=0;
+  if(!hits.length){ $('#cmd-list').innerHTML=`<div class="cmd-void">Aucun résultat pour « ${esc($('#cmd-q').value)} »</div>`; return; }
+  let h='',grp='';
+  hits.forEach((i,n)=>{
+    if(i.grp!==grp){grp=i.grp;h+=`<div class="cmd-grp">${esc(grp)}</div>`;}
+    h+=`<button class="cmd-row${n===CMD_CUR?' cur':''}" data-n="${n}">
+      ${i.fleet?`<span class="fleet">${esc(i.fleet)}</span>`:ic(i.ic||'chev-r-sm')}
+      <span class="lb">${esc(i.lb)}</span><span class="rt">${esc(i.rt||'')}</span></button>`;
+  });
+  $('#cmd-list').innerHTML=h;
+  const cur=$('.cmd-row.cur'); if(cur) cur.scrollIntoView({block:'nearest'});
+}
+let CMD_HITS=[];
+function openCmd(){
+  buildCmd(); CMD_CUR=0; $('#cmd-q').value=''; drawCmd();
+  $('#cmd').classList.add('on'); $('#cmd-scrim').classList.add('on'); $('#cmd-q').focus();
+}
+function closeCmd(){ $('#cmd').classList.remove('on'); $('#cmd-scrim').classList.remove('on'); }
+
+/* =====================================================================
+   NAVIGATION & RENDU GLOBAL
+   ===================================================================== */
+const SHEETS={
+  exec:['Accueil',"Ce qui doit être traité aujourd'hui",'home',renderExec],
+  plan:['Planning','Vues annuelle, mensuelle et hebdomadaire consolidées','calendar',(D,K)=>renderPlan(D,K)],
+  prev:['Préventif','Échéances horaires et respect du programme','wrench',renderPrev],
+  corr:['Correctif & anomalies','Suivi des OT correctifs et registre des défaillances','alert',renderCorr],
+  back:['Backlog','Travaux en attente et vieillissement','stack',renderBack],
+  mag:['Magasin','Pièces de rechange et travaux bloqués','box',renderMag],
+  kpi:['Indicateurs','Tous les KPI du cahier des charges','chart',renderKPI],
+  hist:['Historique','Consolidation de toutes les activités','clock',renderHist]
+};
+let PAGE='exec', DATA=null, FD=null, K=null;
+function renderAll(){
+  if(!DATA) return;
+  FD=applyFilters(DATA); K=computeKPI(FD); buildFilters(DATA);
+  const badge=(id,n)=>{const el=$(id);el.hidden=!n;el.textContent=n;};
+  badge('#t-prev',K.pmRetard); badge('#t-corr',K.anCrit.length+K.coOuv.length);
+  badge('#t-back',K.bk30.length); badge('#t-mag',K.pcAtt.length);
+  for(const k in SHEETS){ try{ SHEETS[k][3](FD,K); }catch(e){ console.error('rendu '+k,e); } }
+  paintIcons();
+}
+function goto(p){
+  if(!SHEETS[p]) return;
+  PAGE=p;
+  $$('#menu a').forEach(a=>a.classList.toggle('on',a.dataset.p===p));
+  $$('.sheet').forEach(s=>s.classList.toggle('on',s.id==='sh-'+p));
+  $('#ttl').textContent=SHEETS[p][0]; $('#lede').textContent=SHEETS[p][1];
+  $('#deck').scrollTop=0;
+}
+/* routeur des data-go : "page", "page:arg", "sys:X", "flotte:X" */
+function route(spec){
+  const [head,...rest]=String(spec).split(':'); const arg=rest.join(':');
+  if(head==='sys'){ SYS_F=(SYS_F===arg?'':arg); renderCorr(FD,K); goto('corr'); return; }
+  if(head==='flotte'){ F.flotte=arg; renderAll(); return; }
+  if(head==='prev'&&arg){ PREV_F=arg; $$('#prev-switch button').forEach(b=>b.classList.toggle('on',b.dataset.f===arg));
+    renderPrev(FD,K); goto('prev'); return; }
+  if(head==='plan'&&arg){ F.type=arg; renderAll(); goto('plan'); return; }
+  goto(head);
+}
+
+/* ---------- synchronisation ---------- */
+function beacon(state,msg){ $('#led').className='led '+state; $('#beacon-tx').textContent=msg; }
+function beaconTick(){
+  const b=$('#beacon');
+  if(STATE.mode!=='gsheets'){
+    beacon(STATE.error?'stale':'', STATE.error?'Google Sheets injoignable':'Classeur Excel');
+    if(b) b.title = STATE.error? 'Repli sur l\'instantané du classeur — '+STATE.error.message : 'Instantané du classeur Excel';
+    return;
+  }
+  if(!STATE.lastSync){ beacon('','En attente'); return; }
+  const s=Math.round((Date.now()-STATE.lastSync)/1000);
+  const ko=STATE.diag.filter(d=>d.err&&d.key).length;
+  beacon(s<CONFIG.refreshMs/1000*2?'live':'stale',
+    (s<60?'Google Sheets · à l\'instant':s<3600?`Google Sheets · il y a ${Math.round(s/60)} min`
+      :`Google Sheets · il y a ${Math.round(s/3600)} h`)+(ko?` · ${ko} onglet(s) en échec`:''));
+  if(b) b.title='Cliquez pour voir la source des données';
+}
+async function reload(){
+  if(STATE.syncing) return;
+  STATE.syncing=true; $('#reload').classList.add('busy');
+  try{
+    DATA=normalize(await loadData());
+    STATE.lastSync=Date.now(); STATE.error=null;
+  }catch(e){
+    console.warn('source distante indisponible :',e.message);
+    STATE.error=e; STATE.mode='embedded';
+    DATA=normalize(JSON.parse(JSON.stringify(EMBEDDED)));   // on n'affiche jamais un écran vide
+  }
+  renderAll(); beaconTick(); renderSource();
+  STATE.syncing=false; $('#reload').classList.remove('busy');
+}
+
+/* ---------- export ---------- */
+let DL=null;
+(async()=>{ try{ DL=(window.claude&&claude.use)?await claude.use('downloads'):null; }catch(e){ DL=null; }
+  const ok=!!DL||!(window.claude&&claude.use);
+  $$('.dl').forEach(b=>b.hidden=!ok); })();
+function toCSV(rows,cols){
+  const q=v=>{const s=String(v==null?'':v);return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  return '﻿'+[cols.map(c=>q(c.t)).join(';'),...rows.map(r=>cols.map(c=>q(c.v(r))).join(';'))].join('\n');
+}
+async function save(name,content){
+  if(DL){ try{ await DL.save({filename:name,data:content}); }catch(e){ console.warn('export annulé',e); } return; }
+  const b=new Blob([content],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+
+/* ---------- infobulles ---------- */
+const PUFF=$('#puff');
+document.addEventListener('mouseover',e=>{
+  const t=e.target.closest('[data-tt]'); if(!t) return;
+  const [a,b]=t.dataset.tt.split('|');
+  PUFF.innerHTML=`<b>${esc(a)}</b>${b?esc(b):''}`; PUFF.classList.add('on'); movePuff(e);
+});
+document.addEventListener('mousemove',e=>{ if(PUFF.classList.contains('on')) movePuff(e); });
+document.addEventListener('mouseout',e=>{ if(e.target.closest('[data-tt]')) PUFF.classList.remove('on'); });
+function movePuff(e){
+  const r=PUFF.getBoundingClientRect();
+  let x=e.clientX+14,y=e.clientY+16;
+  if(x+r.width>innerWidth-10) x=e.clientX-r.width-14;
+  if(y+r.height>innerHeight-10) y=e.clientY-r.height-12;
+  PUFF.style.left=x+'px'; PUFF.style.top=y+'px';
+}
+
+/* =====================================================================
+   SOURCE DES DONNÉES — diagnostic visible et réglage sans toucher au code
+   ===================================================================== */
+function extractPubId(url){
+  const m=String(url||'').match(/\/spreadsheets\/d\/e\/([A-Za-z0-9_-]+)/);
+  if(m) return m[1];
+  const t=String(url||'').trim();
+  return /^2PACX-[A-Za-z0-9_-]+$/.test(t)? t : null;
+}
+function renderSource(){
+  const p=$('#src-panel'); if(!p) return;
+  const live=STATE.mode==='gsheets';
+  const head=`<div class="src-row" style="border-bottom:1px solid var(--rule-2);padding-bottom:9px">
+    <div class="nm"><b>${live?'Google Sheets (publié)':'Instantané du classeur Excel'}</b>
+      <small>${live?esc(CONFIG.pubId.slice(0,22)+'…'):'données figées du fichier d\'origine'}</small></div>
+    <div class="ct">${STATE.lastSync?new Date(STATE.lastSync).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'—'}</div>
+    <div>${live?'<span class="tag g-cl"><span class="pip"></span>En ligne</span>'
+      :'<span class="tag g-ct"><span class="pip"></span>Hors ligne</span>'}</div></div>`;
+  const rows=STATE.diag.length? STATE.diag.map(d=>`<div class="src-row">
+      <div class="nm">${esc(d.name)}${d.gid?`<small>gid ${esc(d.gid)}${d.header?` · en-têtes ligne ${d.header}`:''}</small>`:''}</div>
+      <div class="ct">${d.err?'—':nf(d.rows)+' lig.'}</div>
+      <div>${d.err?`<span class="tag ${d.key?'g-hz':'g-mt'}"><span class="pip"></span>${esc(d.err)}</span>`
+        :'<span class="tag g-cl"><span class="pip"></span>OK</span>'}</div></div>`).join('')
+    : `<div class="murmur" style="margin-top:10px">Aucune lecture distante. Le dashboard affiche l'instantané du classeur.</div>`;
+  p.innerHTML=head+rows;
+
+  const note=$('#fallback-note');
+  if(note){
+    note.innerHTML = (STATE.mode!=='gsheets'&&CONFIG.source==='gsheets')
+      ? `<div class="banner warn">${ic('alert')}<div><b>Lecture du Google Sheets impossible — affichage de l'instantané du classeur.</b><br>
+          Cause : ${esc(STATE.error?STATE.error.message:'inconnue')}. Les chiffres ci-dessous ne sont donc pas à jour.
+          ${/failed to fetch|networkerror|load failed/i.test(STATE.error?STATE.error.message:'')
+            ? "<br>Le navigateur a refusé la requête. Vérifiez que le classeur est bien publié via <b>Fichier → Partager → Publier sur le web → Document entier</b>."
+            : ''}</div>
+          <button class="btn sm act" data-src-open>Vérifier la source</button></div>`
+      : '';
+    paintIcons(note);
+  }
+}
+function openSrc(){
+  $('#src-url').value = CONFIG.pubId? PUB(CONFIG.pubId)+'/pubhtml' : '';
+  $$('#src-mode button').forEach(b=>b.classList.toggle('on',b.dataset.m===CONFIG.source));
+  $('#src-msg').textContent='';
+  $('#src-dlg').classList.add('on'); $('#src-scrim').classList.add('on');
+}
+function closeSrc(){ $('#src-dlg').classList.remove('on'); $('#src-scrim').classList.remove('on'); }
+function saveSrc(){
+  try{ localStorage.setItem('atelier-source',JSON.stringify({pubId:CONFIG.pubId,source:CONFIG.source})); }catch(e){}
+}
+
+/* =====================================================================
+   THÈME — clair · sombre · auto (suit le système)
+   ===================================================================== */
+const THEMES=['auto','light','dark'];
+const THEME_IC={auto:'auto',light:'sun',dark:'moon'};
+const THEME_LBL={auto:'Thème : automatique',light:'Thème : clair',dark:'Thème : sombre'};
+function themePref(){ return document.documentElement.dataset.themePref||'auto'; }
+function applyTheme(pref){
+  const sysDark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = pref==='dark' || (pref==='auto' && sysDark);
+  document.documentElement.dataset.theme = dark?'dark':'light';
+  document.documentElement.dataset.themePref = pref;
+  try{ localStorage.setItem('atelier-theme',pref); }catch(e){}
+  const btn=$('#theme');
+  if(btn){ btn.innerHTML=ic(THEME_IC[pref]); btn.title=THEME_LBL[pref];
+    btn.setAttribute('aria-label',THEME_LBL[pref]); }
+}
+function cycleTheme(){ applyTheme(THEMES[(THEMES.indexOf(themePref())+1)%THEMES.length]); }
+
+/* =====================================================================
+   CÂBLAGE
+   ===================================================================== */
+function init(){
+  paintIcons();
+  applyTheme(themePref());
+  if(window.matchMedia){
+    const mq=matchMedia('(prefers-color-scheme: dark)');
+    const onSys=()=>{ if(themePref()==='auto') applyTheme('auto'); };
+    mq.addEventListener? mq.addEventListener('change',onSys) : mq.addListener(onSys);
+  }
+  $('#theme').addEventListener('click',cycleTheme);
+
+  // source des données
+  $('#beacon').addEventListener('click',openSrc);
+  $('#src-open').addEventListener('click',openSrc);
+  $('#src-close').addEventListener('click',closeSrc);
+  $('#src-scrim').addEventListener('click',closeSrc);
+  document.addEventListener('click',e=>{ if(e.target.closest('[data-src-open]')) openSrc(); });
+  $('#src-mode').addEventListener('click',e=>{const b=e.target.closest('button[data-m]');if(!b)return;
+    CONFIG.source=b.dataset.m; $$('#src-mode button').forEach(x=>x.classList.toggle('on',x===b));});
+  $('#src-apply').addEventListener('click',async()=>{
+    if(CONFIG.source==='gsheets'){
+      const id=extractPubId($('#src-url').value);
+      if(!id){ $('#src-msg').innerHTML='<span style="color:var(--hazard-ink)">Lien non reconnu. Attendu : un lien contenant <code>/spreadsheets/d/e/2PACX-…</code></span>'; return; }
+      CONFIG.pubId=id;
+    }
+    saveSrc(); $('#src-msg').textContent='Chargement…';
+    await reload();
+    $('#src-msg').textContent = STATE.mode==='gsheets'
+      ? 'Connecté. '+STATE.diag.filter(d=>!d.err&&d.key).length+' onglet(s) lu(s).'
+      : 'Échec : '+(STATE.error?STATE.error.message:'cause inconnue');
+    if(STATE.mode==='gsheets') setTimeout(closeSrc,900);
+  });
+  $('#src-reset').addEventListener('click',()=>{
+    CONFIG.pubId=DEFAULT_PUB; CONFIG.source='gsheets'; saveSrc(); openSrc(); });
+
+  // menu mobile
+  const closeNav=()=>$('#app').classList.remove('nav-open');
+  $('#burger').addEventListener('click',()=>$('#app').classList.toggle('nav-open'));
+  $('#rail-scrim').addEventListener('click',closeNav);
+
+  $('#menu').addEventListener('click',e=>{const a=e.target.closest('a[data-p]');
+    if(a){goto(a.dataset.p);$('#app').classList.remove('nav-open');}});
+  $('#tighten').addEventListener('click',()=>$('#app').classList.toggle('tight'));
+  $('#jump').addEventListener('click',()=>$('#app').classList.remove('nav-open'));
+  $('#reload').addEventListener('click',reload);
+  $('#jump').addEventListener('click',openCmd);
+
+  FDEF.forEach(([id,key])=>$('#'+id).addEventListener('change',e=>{F[key]=e.target.value;renderAll();}));
+  $('#s-clear').addEventListener('click',()=>{Object.keys(F).forEach(k=>F[k]='');renderAll();});
+
+  // délégation globale : tiroir engin, routage, tri, filtres au clic
+  document.addEventListener('click',e=>{
+    const f=e.target.closest('[data-fleet]');
+    if(f&&!e.target.closest('[data-go]')){ openFleet(f.dataset.fleet); return; }
+    const g=e.target.closest('[data-go]'); if(g){ route(g.dataset.go); return; }
+    const st=e.target.closest('[data-statut]'); if(st){ F.site='';renderAll();goto('kpi'); return; }
+    const si=e.target.closest('[data-site]'); if(si){ F.site=F.site===si.dataset.site?'':si.dataset.site; renderAll(); return; }
+    const mo=e.target.closest('[data-month]'); if(mo){ CAL.month=+mo.dataset.month; renderPlan(FD); 
+      $('#month').closest('.panel').scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    const dy=e.target.closest('[data-day]'); if(dy){ const d=parseDate(dy.dataset.day);
+      if(d){ CAL.week=startOfWeek(d); renderPlan(FD); } return; }
+    const so=e.target.closest('[data-sort]'); if(so){
+      const [key,i]=so.dataset.sort.split(':');
+      SORT[key]=(SORT[key]&&SORT[key].i===+i)?{i:+i,dir:-SORT[key].dir}:{i:+i,dir:1};
+      renderAll(); return; }
+  });
+
+  $('#scrim').addEventListener('click',closeDrawer);
+  $('#dr-close').addEventListener('click',closeDrawer);
+  $('#cmd-scrim').addEventListener('click',closeCmd);
+  $('#ano-reset').addEventListener('click',()=>{SYS_F='';renderCorr(FD,K);});
+
+  $('#q-switch').addEventListener('click',e=>{const b=e.target.closest('button[data-q]');if(!b)return;
+    Q_MODE=b.dataset.q; $$('#q-switch button').forEach(x=>x.classList.toggle('on',x===b)); renderExec(FD,K);});
+  $('#prev-switch').addEventListener('click',e=>{const b=e.target.closest('button[data-f]');if(!b)return;
+    PREV_F=b.dataset.f; $$('#prev-switch button').forEach(x=>x.classList.toggle('on',x===b)); renderPrev(FD,K);});
+
+  const sl=$('#seuil');
+  sl.addEventListener('input',()=>{ $('#seuil-out').textContent=sl.value+' h'; });
+  sl.addEventListener('change',()=>{ CONFIG.seuilAlerteH=+sl.value; renderAll(); });
+  sl.value=CONFIG.seuilAlerteH; $('#seuil-out').textContent=CONFIG.seuilAlerteH+' h';
+
+  ['y-b','y-f','m-b','m-f','w-b','w-f'].forEach(id=>$('#'+id).addEventListener('click',()=>{
+    if(id==='y-b')CAL.year--; if(id==='y-f')CAL.year++;
+    if(id==='m-b'){if(--CAL.month<0){CAL.month=11;CAL.year--;}}
+    if(id==='m-f'){if(++CAL.month>11){CAL.month=0;CAL.year++;}}
+    if(id==='w-b')CAL.week.setDate(CAL.week.getDate()-7);
+    if(id==='w-f')CAL.week.setDate(CAL.week.getDate()+7);
+    renderPlan(FD);
+  }));
+  $('#wl-q').addEventListener('input',()=>renderPlan(FD));
+  $('#hist-q').addEventListener('input',()=>renderHist(FD,K));
+
+  // palette de commandes
+  $('#cmd-q').addEventListener('input',()=>{CMD_CUR=0;drawCmd();});
+  $('#cmd-list').addEventListener('click',e=>{const r=e.target.closest('[data-n]');if(!r)return;
+    const it=CMD_HITS[+r.dataset.n]; closeCmd(); if(it) it.act();});
+  $('#cmd-q').addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'){e.preventDefault();CMD_CUR=Math.min(CMD_CUR+1,CMD_HITS.length-1);drawCmd();}
+    if(e.key==='ArrowUp'){e.preventDefault();CMD_CUR=Math.max(CMD_CUR-1,0);drawCmd();}
+    if(e.key==='Enter'){e.preventDefault();const it=CMD_HITS[CMD_CUR];closeCmd();if(it)it.act();}
+  });
+
+  // exports
+  const dl=(id,name,rows,cols)=>$('#'+id).addEventListener('click',()=>save(name,toCSV(rows(),cols)));
+  dl('prev-dl','rapport_pm.csv',()=>PREV_ROWS,[
+    {t:'Engin',v:e=>e.id},{t:'Modèle',v:e=>e.modele},{t:'Site',v:e=>e.site},{t:'Statut',v:e=>e.statut},
+    {t:'Index actuel',v:e=>e.index},{t:'Cible PM',v:e=>e.cible},{t:'Heures restantes',v:e=>e.restant},
+    {t:'Date prévue',v:e=>fdate(e.datePrevue)},
+    {t:'Alerte',v:e=>e.restant<0?'DÉPASSÉ':e.restant<=CONFIG.seuilAlerteH?'À PLANIFIER':'CYCLE NORMAL'}]);
+  dl('ano-dl','anomalies.csv',()=>ANO_ROWS,[
+    {t:'ID',v:a=>a.id},{t:'Date',v:a=>fdate(a.date)},{t:'Engin',v:a=>a.fleet},{t:'Système',v:a=>a.systeme},
+    {t:'Description',v:a=>a.desc},{t:'Sévérité',v:a=>a.sev},{t:'Statut',v:a=>a.statut},{t:'Âge (j)',v:a=>a.age}]);
+  dl('back-dl','backlog.csv',()=>FD.backlog,[
+    {t:'ID',v:b=>b.id},{t:'Créé le',v:b=>fdate(b.cree)},{t:'Engin',v:b=>b.fleet},{t:'Type',v:b=>b.type},
+    {t:'Description',v:b=>b.desc},{t:'Origine',v:b=>b.origine},{t:'Statut',v:b=>b.statut},{t:'Âge (j)',v:b=>b.age}]);
+  dl('mag-dl','pieces.csv',()=>FD.pieces,[
+    {t:'Référence',v:p=>p.ref},{t:'Désignation',v:p=>p.desig},{t:'Engin',v:p=>p.fleet},
+    {t:'Qté requise',v:p=>p.qReq},{t:'Qté stock',v:p=>p.qStock},{t:'Manquant',v:p=>p.qManq},
+    {t:'Statut',v:p=>p.statut||p.demande}]);
+  dl('hist-dl','historique.csv',()=>HIST_ROWS,[
+    {t:'Date',v:h=>fdate(h.date)},{t:'Source',v:h=>h.src},{t:'Engin',v:h=>h.fleet},{t:'Équipement',v:h=>h.equip},
+    {t:'Intervention',v:h=>h.act},{t:'Détails',v:h=>h.det},{t:'Intervenant',v:h=>h.qui},
+    {t:'Durée (h)',v:h=>h.duree},{t:'Statut',v:h=>h.statut}]);
+  dl('kpi-dl','indicateurs.csv',()=>KPI_ROWS.map(r=>({l:r[1],v:r[2],d:r[3],s:r[4][1]})),[
+    {t:'Indicateur',v:r=>r.l},{t:'Valeur',v:r=>r.v},{t:'Description',v:r=>r.d},{t:'État',v:r=>r.s}]);
+  $('#kpi-print').addEventListener('click',()=>window.print());
+
+  // clavier
+  document.addEventListener('keydown',e=>{
+    const mod=e.metaKey||e.ctrlKey;
+    if(mod&&e.key.toLowerCase()==='k'){ e.preventDefault(); $('#cmd').classList.contains('on')?closeCmd():openCmd(); return; }
+    if(e.key==='Escape'){ if($('#src-dlg').classList.contains('on'))closeSrc();
+      else if($('#cmd').classList.contains('on'))closeCmd();
+      else if($('#app').classList.contains('nav-open'))$('#app').classList.remove('nav-open');
+      else closeDrawer(); return; }
+    if(e.target.matches('input,select,textarea')) return;
+    if(e.key==='/'){ e.preventDefault(); openCmd(); return; }
+    const ks=Object.keys(SHEETS);
+    if(e.key>='1'&&e.key<='8'){ const p=ks[+e.key-1]; if(p) goto(p); }
+    if(e.key.toLowerCase()==='r') reload();
+    if(e.key.toLowerCase()==='t') cycleTheme();
+  });
+
+  reload();
+  setInterval(()=>{ if(CONFIG.source==='gsheets'&&CONFIG.pubId) reload(); },CONFIG.refreshMs);
+  setInterval(beaconTick,30000);
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
